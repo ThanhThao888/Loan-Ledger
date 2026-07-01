@@ -405,6 +405,7 @@
         <button class="tab-btn" data-tab="payoff">Tất toán sớm</button>
         <button class="tab-btn" data-tab="extra">Trả thêm</button>
         <button class="tab-btn" data-tab="decode">Giải mã HĐ &amp; Kịch bản</button>
+        <button class="tab-btn" data-tab="tips">💡 Tips vay thông minh</button>
       </nav>
 
       <!-- ---------- DASHBOARD ---------- -->
@@ -458,6 +459,28 @@
           <div>Thêm khoản vay để tính tất toán sớm.</div>
         </div>
         <div id="payoffContent" class="hidden">
+          <div class="card">
+            <h3>📋 Lịch sử trả thực tế (tuỳ chọn)</h3>
+            <div class="sub">Nếu bạn từng trả trễ / trả thiếu / trả thêm khác lịch gốc, ghi lại ở đây để tính tất toán chính xác. Bỏ trống nếu khoản vay luôn đúng lịch — hệ thống sẽ tự dùng lịch gốc.</div>
+            <div class="row-controls">
+              <div class="field">
+                <label>Khoản vay</label>
+                <select id="ph_loan"></select>
+              </div>
+              <div class="field">
+                <label>Ngày đã trả</label>
+                <input type="date" id="ph_date">
+              </div>
+              <div class="field">
+                <label>Số tiền đã trả (thực tế)</label>
+                <input type="number" id="ph_amount" placeholder="5000000" step="1000">
+              </div>
+              <button class="btn accent" id="ph_add_btn" style="height: 2.35rem;">+ Ghi nhận</button>
+            </div>
+            <div id="phList" style="margin-top:0.75rem;"></div>
+            <div class="hint" style="margin-top:0.5rem;">Mỗi lần ghi: hệ thống tính lãi dồn tích (lãi đơn, theo ngày) từ lần trả gần nhất tới ngày này, phần còn lại của số tiền bạn trả được trừ vào gốc. Càng ghi đủ, dư nợ tính tất toán bên dưới càng chính xác.</div>
+          </div>
+
           <div class="card">
             <h3>Tính số tiền tất toán sớm</h3>
             <div class="sub">Trả hết một khoản vay vào một ngày bất kỳ — bao gồm dư nợ gốc còn lại và lãi phát sinh dồn tích từ kỳ trả gần nhất.</div>
@@ -603,6 +626,50 @@
             <div id="sensitivitySection" style="margin-top: 1.3rem;"></div>
           </div>
         </div>
+      </section>
+
+      <!-- ---------- TIPS: VAY THÔNG MINH ---------- -->
+      <section id="tab-tips" class="hidden">
+
+        <div class="card">
+          <h3>🧠 Think Like a Banker — góc nhìn của người xét duyệt</h3>
+          <div class="sub">Ngân hàng không nhìn bạn như "người cần tiền". Họ nhìn bạn như một rủi ro cần định giá. Hiểu đúng logic này giúp bạn đàm phán từ vị thế chủ động thay vì cầu xin.</div>
+          <ul style="padding-left:1.1rem; display:flex; flex-direction:column; gap:0.55rem; font-size:0.88rem; line-height:1.55;">
+            <li><strong>5C của tín dụng</strong> — mọi thẩm định vay đều xoay quanh 5 yếu tố: <em>Character</em> (lịch sử uy tín — chính là điểm CIC), <em>Capacity</em> (khả năng trả nợ = thu nhập ổn định trừ chi phí cố định), <em>Capital</em> (bạn có bỏ vốn/tài sản đối ứng bao nhiêu), <em>Collateral</em> (tài sản đảm bảo), <em>Conditions</em> (mục đích vay + bối cảnh kinh tế). Trước khi vay, tự chấm điểm mình theo 5 mục này y như banker sẽ làm — bạn sẽ biết trước hồ sơ mình yếu ở đâu.</li>
+            <li><strong>DTI (Debt-to-Income) là con số họ nhìn đầu tiên</strong> — tổng nợ phải trả hàng tháng (mọi khoản vay cộng lại) chia cho thu nhập ròng. Đa số ngân hàng VN muốn DTI dưới 40–50%. Trước khi nộp hồ sơ, tự tính DTI của mình — nếu đã sát ngưỡng, khoản vay mới rất dễ bị từ chối hoặc bị áp lãi suất cao hơn để bù rủi ro.</li>
+            <li><strong>Ngân hàng thích "dễ đoán" hơn "thu nhập cao"</strong> — một người lương 20 triệu đều đặn 3 năm thường được đánh giá tốt hơn người thu nhập 40 triệu nhưng bấp bênh theo dự án. Nếu thu nhập của bạn không cố định (freelance, hoa hồng...), hãy chuẩn bị sao kê dài hơn (12–24 tháng) để chứng minh tính ổn định, thay vì chỉ đưa 3 tháng gần nhất.</li>
+            <li><strong>Thời điểm nộp hồ sơ cũng là một biến số</strong> — ngân hàng có chỉ tiêu giải ngân theo quý/năm. Cuối quý hoặc cuối năm tài chính, một số chi nhánh sẵn sàng linh hoạt hơn về điều kiện để đạt KPI. Đây không phải mẹo chắc chắn, nhưng đáng thử hỏi nhân viên tín dụng nếu bạn đang ở ngưỡng biên.</li>
+            <li><strong>Đàm phán lãi suất luôn có dư địa hơn bạn nghĩ</strong> — lãi suất niêm yết là điểm khởi đầu, không phải điểm cuối, đặc biệt nếu bạn có: thu nhập trả qua ngân hàng đó, tài sản đảm bảo tốt, hoặc đang là khách hàng lâu năm. Hỏi thẳng "mức lãi suất tốt nhất anh/chị có thể áp dụng cho hồ sơ như em là bao nhiêu" — nhiều khi tốt hơn mức niêm yết 0.3–0.8%/năm.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>📈 Tăng & bảo vệ điểm tín dụng CIC</h3>
+          <div class="sub">CIC (Trung tâm Thông tin Tín dụng Quốc gia Việt Nam) chấm điểm bạn từ lịch sử vay/trả nợ tại mọi tổ chức tín dụng. Điểm càng cao, càng dễ vay & lãi suất càng tốt.</div>
+          <ul style="padding-left:1.1rem; display:flex; flex-direction:column; gap:0.55rem; font-size:0.88rem; line-height:1.55;">
+            <li><strong>Đúng hạn là yếu tố nặng ký nhất</strong> — CIC phân loại nợ theo 5 nhóm (Nhóm 1: đủ tiêu chuẩn → Nhóm 5: có khả năng mất vốn). Chỉ cần trễ hạn quá 90 ngày, khoản vay bị chuyển sang nợ xấu (Nhóm 3 trở lên) — lịch sử này lưu lại CIC nhiều năm, ảnh hưởng mọi hồ sơ vay sau này kể cả ở ngân hàng khác.</li>
+            <li><strong>Trễ vài ngày ít nghiêm trọng hơn bạn tưởng, nhưng đừng để thành thói quen</strong> — trễ 1–10 ngày thường chỉ bị phí phạt, chưa ảnh hưởng nhóm nợ. Nhưng nếu lặp lại nhiều kỳ, hệ thống chấm điểm hành vi (không chỉ nhóm nợ) sẽ đánh giá bạn kém ổn định hơn — điều này có thể ảnh hưởng ngầm dù chưa "chính thức" thành nợ xấu.</li>
+            <li><strong>Thẻ tín dụng cũng tính vào CIC</strong> — kể cả không vay tiêu dùng, việc quẹt thẻ tín dụng & trả đúng hạn đều đặn là cách xây lịch sử tín dụng "sạch" nhanh và ít rủi ro nhất, vì hạn mức thường nhỏ.</li>
+            <li><strong>Tỷ lệ sử dụng hạn mức tín dụng nên dưới 30%</strong> — nếu thẻ hạn mức 20 triệu mà bạn quẹt sát 20 triệu mỗi tháng (dù trả đủ), một số mô hình chấm điểm coi đây là dấu hiệu phụ thuộc tín dụng, không tốt bằng người dùng đều đặn 20–30% hạn mức.</li>
+            <li><strong>Tự kiểm tra điểm CIC định kỳ</strong> — có thể tra cứu miễn phí qua ứng dụng CIC Credit Connect hoặc website cic.gov.vn (1 lần/năm miễn phí). Kiểm tra trước khi nộp hồ sơ vay lớn, để phát hiện sớm nếu có khoản nợ cũ bạn quên, hoặc sai sót từ phía ngân hàng cần khiếu nại kịp thời.</li>
+            <li><strong>Đóng khoản vay/thẻ không dùng cũng cần cẩn thận</strong> — đóng thẻ tín dụng cũ (nhất là thẻ có lịch sử dài, tốt) đôi khi làm giảm điểm vì rút ngắn "tuổi đời tín dụng" trung bình. Nếu không có phí thường niên, giữ thẻ cũ mở nhưng ít dùng thường tốt hơn đóng hẳn.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>⚖️ So sánh lãi suất & loại vay giữa các ngân hàng</h3>
+          <div class="sub">Đừng chỉ nhìn con số lãi suất niêm yết — đó chỉ là một phần của tổng chi phí thực.</div>
+          <ul style="padding-left:1.1rem; display:flex; flex-direction:column; gap:0.55rem; font-size:0.88rem; line-height:1.55;">
+            <li><strong>Phân biệt lãi suất cố định vs thả nổi</strong> — vay mua nhà/xe ở VN thường có ưu đãi cố định 6–24 tháng đầu (thấp), sau đó thả nổi theo công thức "lãi suất tiết kiệm 12–13 tháng + biên độ 3–4%". Luôn hỏi rõ công thức thả nổi sau ưu đãi — đây là chỗ nhiều người bị "sốc" tiền trả hàng tháng tăng vọt sau năm đầu.</li>
+            <li><strong>So sánh APR (chi phí thực), không chỉ lãi suất danh nghĩa</strong> — cùng lãi suất 10%/năm nhưng cách tính trên dư nợ giảm dần (declining balance) và trên dư nợ gốc ban đầu (flat rate) cho ra chi phí thực chênh nhau rất lớn — flat rate 10% thường tương đương declining balance ~18-19%. Vay tiêu dùng tín chấp hay quảng cáo theo flat rate vì con số trông thấp hơn thực tế.</li>
+            <li><strong>Tính luôn phí ẩn</strong> — phí thẩm định, phí bảo hiểm khoản vay (bắt buộc ở một số ngân hàng), phí trả nợ trước hạn, phí quản lý tài khoản. Một khoản vay lãi suất thấp hơn 0.5% nhưng phí bảo hiểm 2% gốc có thể đắt hơn khoản vay lãi cao hơn nhưng không phí.</li>
+            <li><strong>Vay ngân hàng thương mại nhà nước (Vietcombank, BIDV, VietinBank, Agribank) thường lãi thấp hơn nhưng thủ tục chặt hơn</strong>; ngân hàng tư nhân/số (Techcombank, TPBank, VPBank, MB, Cake, Timo...) thường duyệt nhanh hơn, linh hoạt hồ sơ hơn nhưng lãi suất và phí có thể cao hơn — đánh đổi giữa tốc độ và chi phí.</li>
+            <li><strong>Vay tại ngân hàng bạn đã có lịch sử giao dịch thường có lợi thế</strong> — lương chuyển khoản qua, có sổ tiết kiệm, đã từng vay & trả tốt — những dữ liệu này ngân hàng đã có sẵn, thẩm định nhanh hơn và đôi khi được ưu đãi lãi suất riêng mà không quảng cáo đại trà, chỉ có khi hỏi trực tiếp.</li>
+            <li><strong>Luôn yêu cầu bảng minh hoạ dòng tiền (amortization schedule) trước khi ký</strong> — không chỉ nghe con số "trả X triệu/tháng". Bảng minh hoạ cho thấy rõ bao nhiêu vào gốc, bao nhiêu vào lãi mỗi kỳ — đây cũng là lúc dùng tab "Giải mã HĐ" của app này để tự kiểm tra chéo trước khi tin vào bảng ngân hàng đưa.</li>
+          </ul>
+        </div>
+
+        <div class="hint" style="margin-bottom:1rem;">Phần này sẽ được bổ sung dần theo thời gian. Nếu có tình huống cụ thể (loại vay, ngân hàng, hồ sơ) muốn phân tích sâu hơn, cứ mang qua hỏi trực tiếp.</div>
       </section>
 
     </main>
@@ -860,6 +927,29 @@ function balanceAsOfToday(loan) {
 /* ============================================================
    PAYOFF QUOTE (early settlement as of an arbitrary date)
    ============================================================ */
+/* ============================================================
+   LỊCH SỬ TRẢ THỰC TẾ — dùng khi kỳ trả lệch lịch gốc (trễ/thiếu/thêm)
+   Ledger đơn giản: mỗi lần trả, tính lãi đơn dồn tích từ lần trả gần
+   nhất tới ngày này, phần dư của số tiền trả trừ thẳng vào gốc.
+   Cùng convention lãi đơn / 365 ngày mà app đang dùng cho phần
+   tất toán sớm và phí trễ hạn, nên nhất quán với phần còn lại.
+   ============================================================ */
+function computeActualBalance(loan) {
+  const dailyRate = (loan.ratePct / 100) / 365;
+  let balance = loan.principal;
+  let lastDate = parseDateOnly(loan.startDate);
+  const history = (loan.paymentHistory || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+  for (const h of history) {
+    const d = parseDateOnly(h.date);
+    const days = Math.max(0, daysBetween(lastDate, d));
+    const interestAccrued = balance * dailyRate * days;
+    const principalPaid = h.amount - interestAccrued;
+    balance = Math.max(0, balance - principalPaid);
+    lastDate = d;
+  }
+  return { balance, lastDate, hasHistory: history.length > 0 };
+}
+
 function calculatePayoffQuote(loan, asOfStr) {
   const asOf = parseDateOnly(asOfStr);
   const sched = getLoanSchedule(loan);
@@ -881,6 +971,14 @@ function calculatePayoffQuote(loan, asOfStr) {
     }
   }
 
+  // ✅ Nếu có ghi lịch sử trả thực tế (lệch lịch gốc), ưu tiên dùng
+  // dư nợ + ngày trả gần nhất tính từ lịch sử thay vì lịch lý thuyết.
+  const actual = computeActualBalance(loan);
+  if (actual.hasHistory) {
+    remainingBalance = actual.balance;
+    lastDate = actual.lastDate;
+  }
+
   const dailyRate = (loan.ratePct / 100) / 365;
   const daysAccrued = Math.max(0, daysBetween(lastDate, asOf));
   const accruedInterest = remainingBalance * dailyRate * daysAccrued;
@@ -893,6 +991,7 @@ function calculatePayoffQuote(loan, asOfStr) {
     daysAccrued,
     accruedInterest,
     payoffAmount,
+    usedActualHistory: actual.hasHistory,
     interestSavedVsFullTerm: futureInterestScheduled // interest you avoid by not continuing on schedule
   };
 }
@@ -1532,7 +1631,7 @@ function deleteActiveLoan() {
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['dashboard', 'schedule', 'payoff', 'extra', 'decode'].forEach(t => {
+  ['dashboard', 'schedule', 'payoff', 'extra', 'decode', 'tips'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
   });
   if (tab === 'schedule') renderScheduleTab();
@@ -1725,6 +1824,61 @@ function renderPayoffTab() {
   const dateInput = document.getElementById('payoff_date');
   if (!dateInput.value) dateInput.value = toDateInputValue(new Date());
 
+  // ── Lịch sử trả thực tế ──
+  const phSelect = document.getElementById('ph_loan');
+  populateLoanSelect(phSelect, false);
+  const phDate = document.getElementById('ph_date');
+  if (!phDate.value) phDate.value = toDateInputValue(new Date());
+
+  function renderPhList() {
+    const loan = loans.find(l => l.id === phSelect.value);
+    const listEl = document.getElementById('phList');
+    if (!loan) { listEl.innerHTML = ''; return; }
+    const history = (loan.paymentHistory || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    if (history.length === 0) {
+      listEl.innerHTML = '<div class="empty-note">Chưa ghi lần trả nào cho khoản vay này.</div>';
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead><tr><th style="text-align:left;">Ngày trả</th><th>Số tiền đã trả</th><th></th></tr></thead>
+          <tbody>${history.map((h, i) => `
+            <tr>
+              <td style="text-align:left;">${formatDateVN(parseDateOnly(h.date))}</td>
+              <td>${money(loan, h.amount)}</td>
+              <td><button class="btn small ghost" data-ph-del="${h.date}|${h.amount}" style="color:var(--alert);">Xoá</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    listEl.querySelectorAll('[data-ph-del]').forEach(btn => {
+      btn.onclick = () => {
+        const [d, a] = btn.dataset.phDel.split('|');
+        loan.paymentHistory = (loan.paymentHistory || []).filter(h => !(h.date === d && String(h.amount) === a));
+        persistLoans();
+        renderPhList();
+      };
+    });
+  }
+
+  phSelect.onchange = renderPhList;
+  renderPhList();
+
+  document.getElementById('ph_add_btn').onclick = () => {
+    const loan = loans.find(l => l.id === phSelect.value);
+    if (!loan) return;
+    const amount = parseFloat(document.getElementById('ph_amount').value);
+    const date = phDate.value;
+    if (!date || isNaN(amount) || amount <= 0) { alert('Nhập ngày và số tiền hợp lệ.'); return; }
+    if (!loan.paymentHistory) loan.paymentHistory = [];
+    loan.paymentHistory.push({ date, amount });
+    persistLoans();
+    document.getElementById('ph_amount').value = '';
+    renderPhList();
+    renderAll();
+  };
+
   document.getElementById('payoff_calc_btn').onclick = () => {
     const loan = loans.find(l => l.id === select.value);
     if (!loan) return;
@@ -1744,7 +1898,7 @@ function renderPayoffTab() {
           <div class="v">${money(loan, quote.interestSavedVsFullTerm)}</div>
         </div>
       </div>
-      <div class="hint" style="margin-top:0.6rem;">Lãi dồn tích tính theo lãi đơn = dư nợ × (lãi suất năm / 365) × số ngày kể từ kỳ trả gần nhất. ${hasFee ? 'Phí tất toán sớm lấy theo cấu hình đã lưu trong khoản vay này.' : 'Khoản vay này chưa cấu hình phí tất toán sớm — vào form sửa khoản vay để thêm nếu hợp đồng có quy định.'}</div>
+      <div class="hint" style="margin-top:0.6rem;">Lãi dồn tích tính theo lãi đơn = dư nợ × (lãi suất năm / 365) × số ngày kể từ kỳ trả gần nhất. ${hasFee ? 'Phí tất toán sớm lấy theo cấu hình đã lưu trong khoản vay này.' : 'Khoản vay này chưa cấu hình phí tất toán sớm — vào form sửa khoản vay để thêm nếu hợp đồng có quy định.'} ${quote.usedActualHistory ? '<strong style="color:var(--accent);">Đã dùng lịch sử trả thực tế bạn ghi ở trên để tính dư nợ — không dùng lịch gốc.</strong>' : 'Chưa có lịch sử trả thực tế nào được ghi, nên số này giả định bạn trả đúng lịch gốc từ đầu tới nay.'}</div>
     `;
   };
 }
