@@ -261,9 +261,14 @@
       <div class="brand">Loan <span>Ledger</span></div>
       <div class="tagline">nhiều khoản vay · một sổ cái</div>
     </div>
-    <div style="text-align:right;">
-      <div class="eyebrow">Hôm nay</div>
-      <div id="todayLabel" style="font-family: var(--mono); font-size: 0.85rem;"></div>
+    <div style="text-align:right; display:flex; align-items:center; gap:0.75rem;">
+      <a href="https://thanhthao888.github.io/venus/" target="_blank" rel="noopener noreferrer"
+        class="btn small ghost" title="Về Finance Career Skills Tracker"
+        style="text-decoration:none;">🏠 Tracker</a>
+      <div>
+        <div class="eyebrow">Hôm nay</div>
+        <div id="todayLabel" style="font-family: var(--mono); font-size: 0.85rem;"></div>
+      </div>
     </div>
   </header>
 
@@ -277,6 +282,12 @@
           <button class="btn small ghost" id="copyPortfolioBtn" title="Copy tổng hợp toàn bộ khoản vay để hỏi AI ngoài">📋 Copy tất cả</button>
           <button class="btn small" id="newLoanBtn">+ Khoản vay</button>
         </div>
+      </div>
+
+      <div style="display:flex; gap:0.4rem; padding:0.6rem 1.1rem 0; flex-wrap:wrap;">
+        <button class="btn small ghost" id="exportLoansBtn" title="Tải file backup toàn bộ khoản vay">📥 Export</button>
+        <button class="btn small ghost" id="importLoansBtn" title="Khôi phục từ file backup">📤 Import</button>
+        <input type="file" id="importLoansFile" accept=".json" style="display:none;">
       </div>
 
       <div class="loan-cards" id="loanCards"></div>
@@ -616,6 +627,66 @@ function loadLoans() {
 }
 function persistLoans() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(loans)); } catch (e) {}
+}
+
+/* ============================================================
+   EXPORT / IMPORT — backup toàn bộ khoản vay ra file JSON
+   ============================================================ */
+function exportLoans() {
+  try {
+    if (loans.length === 0) { alert('Chưa có khoản vay nào để export.'); return; }
+    const backup = {
+      __meta: {
+        app: 'Loan Ledger',
+        exportDate: new Date().toISOString(),
+        version: '1.0',
+        loanCount: loans.length
+      },
+      loans: loans
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `loan-ledger-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Export thất bại: ' + e.message);
+  }
+}
+
+function importLoans(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      // Nhận cả file backup có __meta.loans lẫn file chỉ là mảng loans thuần
+      const incoming = Array.isArray(parsed) ? parsed : parsed.loans;
+      if (!Array.isArray(incoming) || incoming.length === 0) {
+        alert('File không hợp lệ hoặc không có khoản vay nào.');
+        return;
+      }
+      const ok = confirm(
+        `File chứa ${incoming.length} khoản vay.\n` +
+        `Toàn bộ danh mục vay hiện tại sẽ bị GHI ĐÈ.\n` +
+        `Tiếp tục?`
+      );
+      if (!ok) return;
+      loans = incoming;
+      persistLoans();
+      activeLoanId = null;
+      closeLoanForm();
+      renderAll();
+      alert(`Đã khôi phục ${incoming.length} khoản vay.`);
+    } catch (err) {
+      alert('Import thất bại: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
 /* ============================================================
@@ -2037,6 +2108,13 @@ function init() {
   });
   document.getElementById('cancelFormBtn').addEventListener('click', closeLoanForm);
   document.getElementById('saveLoanBtn').addEventListener('click', saveLoanFromForm);
+
+  document.getElementById('exportLoansBtn').addEventListener('click', exportLoans);
+  document.getElementById('importLoansBtn').addEventListener('click', () => document.getElementById('importLoansFile').click());
+  document.getElementById('importLoansFile').addEventListener('change', (e) => {
+    importLoans(e.target.files[0]);
+    e.target.value = '';
+  });
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
