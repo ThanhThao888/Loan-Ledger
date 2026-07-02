@@ -116,10 +116,12 @@
     border: 1px solid var(--line); border-radius: var(--radius);
     padding: 0.7rem 0.8rem; cursor: pointer; background: var(--white);
     transition: border-color 0.12s ease;
+    overflow: hidden; max-width: 100%; box-sizing: border-box;
   }
   .loan-card:hover { border-color: var(--ink-faint); }
   .loan-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
-  .loan-card .name { font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+  .loan-card .name { font-weight: 600; font-size: 0.9rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.4rem 0.5rem; min-width: 0; }
+  .loan-card .name > span:first-child { min-width: 0; overflow-wrap: break-word; word-break: break-word; flex: 1 1 auto; }
   .copy-icon-btn {
     border: 1px solid var(--line); background: var(--paper-raised); color: var(--ink-soft);
     border-radius: 4px; font-size: 0.66rem; padding: 0.15rem 0.4rem; cursor: pointer;
@@ -130,7 +132,10 @@
   .loan-card .name .type-tag {
     font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase;
     color: var(--ink-soft); border: 1px solid var(--line); border-radius: 3px; padding: 0.05rem 0.35rem; white-space: nowrap;
+    margin-left: 0.35rem; display: inline-block;
   }
+  .loan-card .figures { max-width: 100%; overflow: hidden; }
+  .loan-card .figures span { overflow: hidden; text-overflow: ellipsis; }
   .loan-card .figures { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); margin-top: 0.35rem; display: flex; justify-content: space-between; }
   .loan-card .bar-track { height: 5px; background: var(--line-soft); border-radius: 4px; margin-top: 0.5rem; overflow: hidden; }
   .loan-card .bar-fill { height: 100%; background: var(--accent); }
@@ -912,12 +917,9 @@ function getLoanSchedule(loan) {
 
 function balanceAsOfToday(loan) {
   const sched = getLoanSchedule(loan);
-  const today = new Date();
-  let last = null;
-  for (const p of sched.payments) {
-    if (p.date <= today) last = p;
-    else break;
-  }
+  const paidPeriods = Array.isArray(loan.paidPeriods) ? loan.paidPeriods : [];
+  const highestPaid = paidPeriods.length ? Math.max(...paidPeriods) : 0;
+  const last = highestPaid > 0 ? sched.payments.find(p => p.period === highestPaid) : null;
   return {
     balance: last ? last.balance : loan.principal,
     lastPaymentDate: last ? last.date : parseDateOnly(loan.startDate),
