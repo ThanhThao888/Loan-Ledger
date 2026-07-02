@@ -251,6 +251,98 @@
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+  /* ============== ACCESSIBILITY: FOCUS ============== */
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  /* ============== QUICK-GLANCE STRIP (always-visible reminder) ============== */
+  .glance {
+    display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    padding: 0.6rem 0.9rem; margin-bottom: 1.1rem; font-size: 0.83rem;
+  }
+  .glance .glance-icon { font-size: 1rem; flex: 0 0 auto; }
+  .glance .glance-text { flex: 1 1 auto; min-width: 200px; }
+  .glance .glance-text strong { font-family: var(--mono); }
+  .glance.glance-overdue { background: var(--alert-soft); border-color: var(--alert-line); }
+  .glance.glance-soon { background: var(--gold-soft); border-color: var(--gold-line); }
+  .glance.glance-ok { background: var(--accent-soft); border-color: var(--accent-line); }
+  .glance .btn { flex: 0 0 auto; }
+
+  /* ============== LOAN CARD STATUS PILL ============== */
+  .card-status-row { display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; }
+  .status-pill {
+    font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.02em;
+    border-radius: 3px; padding: 0.12rem 0.4rem; border: 1px solid var(--line); white-space: nowrap;
+  }
+  .status-pill.overdue { background: var(--alert-soft); border-color: var(--alert-line); color: var(--alert); }
+  .status-pill.soon { background: var(--gold-soft); border-color: var(--gold-line); color: var(--gold); }
+  .status-pill.ok { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+  .status-pill.done { background: var(--line-soft); border-color: var(--line); color: var(--ink-faint); }
+
+  /* ============== COLLAPSIBLE FORM SECTIONS ============== */
+  details.form-section { border-top: 1px solid var(--line-soft); margin-top: 0.9rem; }
+  details.form-section summary {
+    list-style: none; cursor: pointer; padding-top: 0.9rem; margin-bottom: 0.65rem;
+    display: flex; align-items: center; justify-content: space-between; user-select: none;
+  }
+  details.form-section summary::-webkit-details-marker { display: none; }
+  details.form-section summary .eyebrow { margin: 0; padding: 0; border: none; }
+  details.form-section summary .chev { font-family: var(--mono); color: var(--ink-faint); font-size: 0.75rem; transition: transform 0.15s ease; }
+  details.form-section[open] summary .chev { transform: rotate(90deg); }
+  details.form-section summary .badge-on {
+    font-family: var(--mono); font-size: 0.62rem; color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent-line); border-radius: 3px; padding: 0.08rem 0.35rem; margin-left: 0.5rem;
+  }
+
+  /* ============== TAB CONTENT TRANSITION ============== */
+  main section:not(.hidden) { animation: fadeIn 0.18s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .tab-btn { flex: 0 0 auto; }
+
+  /* ============== TOASTS ============== */
+  #toastHost {
+    position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 1000;
+    display: flex; flex-direction: column; gap: 0.55rem; max-width: min(360px, calc(100vw - 2rem));
+  }
+  .toast {
+    background: var(--ink); color: var(--white); border-radius: var(--radius);
+    padding: 0.7rem 0.85rem; font-size: 0.83rem; line-height: 1.45;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18); display: flex; gap: 0.6rem; align-items: flex-start;
+    animation: toastIn 0.18s ease;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .toast.leaving { animation: toastOut 0.15s ease forwards; }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(4px); } }
+  .toast .t-icon { flex: 0 0 auto; font-size: 0.95rem; line-height: 1; margin-top: 0.1rem; }
+  .toast .t-msg { flex: 1 1 auto; }
+  .toast .t-close { flex: 0 0 auto; background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 0.9rem; padding: 0; line-height: 1; }
+  .toast .t-close:hover { color: var(--white); }
+  .toast.error { background: var(--alert); }
+  .toast.success { background: var(--accent); }
+  .toast.warning { background: var(--gold); color: var(--ink); }
+  .toast.warning .t-close { color: rgba(34,38,46,0.55); }
+  .toast.warning .t-close:hover { color: var(--ink); }
+  .toast.info { background: var(--ink); }
+
+  /* ============== CONFIRM MODAL ============== */
+  #confirmOverlay {
+    position: fixed; inset: 0; background: rgba(34,38,46,0.45); z-index: 1100;
+    display: flex; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .confirm-box {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    max-width: 380px; width: 100%; padding: 1.2rem 1.3rem; box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+    animation: toastIn 0.15s ease;
+  }
+  .confirm-box .confirm-msg { font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.1rem; }
+  .confirm-box .form-actions { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -271,6 +363,8 @@
       </div>
     </div>
   </header>
+
+  <div id="glanceStrip"></div>
 
   <div class="layout">
 
@@ -330,65 +424,75 @@
           </div>
         </div>
 
-        <div class="eyebrow section-divider">Phí trả chậm (tuỳ chọn)</div>
-        <div class="form-grid">
-          <div class="field full">
-            <label>Kiểu phạt trả chậm</label>
-            <select id="f_late_type">
-              <option value="none">Không cấu hình phí trả chậm</option>
-              <option value="daily_penalty">Lãi phạt theo ngày (đơn) — % × hệ số nhân lãi vay</option>
-              <option value="fixed">Phí cố định mỗi kỳ trễ</option>
-              <option value="percent">% cố định trên số tiền quá hạn</option>
-              <option value="tiered">Theo bậc — tăng dần theo số ngày trễ</option>
-            </select>
+        <details class="form-section" id="f_late_section">
+          <summary>
+            <span class="eyebrow">Phí trả chậm <span class="hint" style="display:inline;">(tuỳ chọn)</span><span class="badge-on hidden" id="f_late_badge">đang bật</span></span>
+            <span class="chev">▸</span>
+          </summary>
+          <div class="form-grid">
+            <div class="field full">
+              <label>Kiểu phạt trả chậm</label>
+              <select id="f_late_type">
+                <option value="none">Không cấu hình phí trả chậm</option>
+                <option value="daily_penalty">Lãi phạt theo ngày (đơn) — % × hệ số nhân lãi vay</option>
+                <option value="fixed">Phí cố định mỗi kỳ trễ</option>
+                <option value="percent">% cố định trên số tiền quá hạn</option>
+                <option value="tiered">Theo bậc — tăng dần theo số ngày trễ</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Số ngày gia hạn (grace period)</label>
+              <input type="number" id="f_late_grace" value="3" min="0">
+            </div>
+            <div class="field" id="f_late_mult_wrap">
+              <label>Hệ số nhân lãi phạt</label>
+              <input type="number" id="f_late_multiplier" value="1.5" step="0.1">
+              <div class="hint">1.5 = lãi phạt bằng 150% lãi suất khoản vay, tính đơn theo ngày trên số tiền quá hạn</div>
+            </div>
+            <div class="field hidden" id="f_late_fixed_wrap">
+              <label>Phí cố định mỗi kỳ trễ</label>
+              <input type="number" id="f_late_fixed" placeholder="500000">
+            </div>
+            <div class="field hidden" id="f_late_pct_wrap">
+              <label>% trên số tiền quá hạn</label>
+              <input type="number" id="f_late_pct" placeholder="5" step="0.5">
+            </div>
+            <div class="field">
+              <label>Trần phạt (% số tiền quá hạn)</label>
+              <input type="number" id="f_late_cap" value="5" step="0.5">
+              <div class="hint">Để 0 = không giới hạn trần</div>
+            </div>
           </div>
-          <div class="field">
-            <label>Số ngày gia hạn (grace period)</label>
-            <input type="number" id="f_late_grace" value="3" min="0">
-          </div>
-          <div class="field" id="f_late_mult_wrap">
-            <label>Hệ số nhân lãi phạt</label>
-            <input type="number" id="f_late_multiplier" value="1.5" step="0.1">
-            <div class="hint">1.5 = lãi phạt bằng 150% lãi suất khoản vay, tính đơn theo ngày trên số tiền quá hạn</div>
-          </div>
-          <div class="field hidden" id="f_late_fixed_wrap">
-            <label>Phí cố định mỗi kỳ trễ</label>
-            <input type="number" id="f_late_fixed" placeholder="500000">
-          </div>
-          <div class="field hidden" id="f_late_pct_wrap">
-            <label>% trên số tiền quá hạn</label>
-            <input type="number" id="f_late_pct" placeholder="5" step="0.5">
-          </div>
-          <div class="field">
-            <label>Trần phạt (% số tiền quá hạn)</label>
-            <input type="number" id="f_late_cap" value="5" step="0.5">
-            <div class="hint">Để 0 = không giới hạn trần</div>
-          </div>
-        </div>
+        </details>
 
-        <div class="eyebrow section-divider">Phí tất toán sớm (tuỳ chọn)</div>
-        <div class="form-grid">
-          <div class="field full">
-            <label>Kiểu phí</label>
-            <select id="f_early_type">
-              <option value="none">Không phí tất toán sớm</option>
-              <option value="percent">% cố định trên dư nợ còn lại</option>
-              <option value="fixed">Phí cố định</option>
-              <option value="sliding">Giảm dần theo thời gian (sliding scale)</option>
-            </select>
+        <details class="form-section" id="f_early_section">
+          <summary>
+            <span class="eyebrow">Phí tất toán sớm <span class="hint" style="display:inline;">(tuỳ chọn)</span><span class="badge-on hidden" id="f_early_badge">đang bật</span></span>
+            <span class="chev">▸</span>
+          </summary>
+          <div class="form-grid">
+            <div class="field full">
+              <label>Kiểu phí</label>
+              <select id="f_early_type">
+                <option value="none">Không phí tất toán sớm</option>
+                <option value="percent">% cố định trên dư nợ còn lại</option>
+                <option value="fixed">Phí cố định</option>
+                <option value="sliding">Giảm dần theo thời gian (sliding scale)</option>
+              </select>
+            </div>
+            <div class="field hidden" id="f_early_val_wrap">
+              <label>Giá trị (% hoặc số tiền tuỳ kiểu)</label>
+              <input type="number" id="f_early_value" placeholder="2" step="0.5">
+            </div>
+            <div class="field">
+              <label>Áp dụng đến hết tháng thứ</label>
+              <input type="number" id="f_early_until" placeholder="36">
+              <div class="hint">Để trống = áp dụng suốt kỳ hạn</div>
+            </div>
           </div>
-          <div class="field hidden" id="f_early_val_wrap">
-            <label>Giá trị (% hoặc số tiền tuỳ kiểu)</label>
-            <input type="number" id="f_early_value" placeholder="2" step="0.5">
-          </div>
-          <div class="field">
-            <label>Áp dụng đến hết tháng thứ</label>
-            <input type="number" id="f_early_until" placeholder="36">
-            <div class="hint">Để trống = áp dụng suốt kỳ hạn</div>
-          </div>
-        </div>
-        <div class="hint" style="margin-top: -0.3rem; margin-bottom: 0.4rem;">Kịch bản "sliding" dùng mặc định 3%/năm 1, 2%/năm 2, 1%/năm 3, 0% từ năm 4 — chỉnh sửa trực tiếp trong dữ liệu lưu nếu cần bậc khác.</div>
-        <div class="hint">Kỳ trả nợ đầu tiên = 1 tháng sau ngày bắt đầu. Ngày trả các kỳ sau giữ đúng ngày-trong-tháng, tự dồn về cuối tháng nếu tháng đó ngắn hơn.</div>
+          <div class="hint" style="margin-top: 0.5rem;">Kịch bản "sliding" dùng mặc định 3%/năm 1, 2%/năm 2, 1%/năm 3, 0% từ năm 4 — chỉnh sửa trực tiếp trong dữ liệu lưu nếu cần bậc khác.</div>
+        </details>
+        <div class="hint" style="margin-top: 0.6rem;">Kỳ trả nợ đầu tiên = 1 tháng sau ngày bắt đầu. Ngày trả các kỳ sau giữ đúng ngày-trong-tháng, tự dồn về cuối tháng nếu tháng đó ngắn hơn.</div>
 
         <div class="form-actions">
           <button class="btn ghost" id="cancelFormBtn">Huỷ</button>
@@ -405,6 +509,7 @@
         <button class="tab-btn" data-tab="payoff">Tất toán sớm</button>
         <button class="tab-btn" data-tab="extra">Trả thêm</button>
         <button class="tab-btn" data-tab="decode">Giải mã HĐ &amp; Kịch bản</button>
+        <button class="tab-btn" data-tab="priority">🎯 Ưu tiên trả nợ</button>
         <button class="tab-btn" data-tab="tips">💡 Tips vay thông minh</button>
       </nav>
 
@@ -628,6 +733,44 @@
         </div>
       </section>
 
+      <!-- ---------- PRIORITY: ƯU TIÊN TRẢ NỢ ---------- -->
+      <section id="tab-priority" class="hidden">
+        <div id="priorityEmpty" class="card empty-state hidden">
+          <div class="glyph">🎯</div>
+          <div>Thêm ít nhất khoản vay để xem xếp hạng ưu tiên trả nợ.</div>
+        </div>
+        <div id="priorityContent" class="hidden">
+
+          <div class="card">
+            <h3>Nên trả khoản nào trước?</h3>
+            <div class="sub">Khi có tiền dư, đổ vào đúng khoản vay có thể tiết kiệm hàng chục triệu tiền lãi — đổ sai chỗ thì gần như không khác gì để tiền nằm im.</div>
+            <div class="row-controls">
+              <div class="seg" id="priority_method_seg">
+                <button data-method="avalanche" class="active">Avalanche — lãi suất cao trước</button>
+                <button data-method="snowball">Snowball — dư nợ nhỏ trước</button>
+                <button data-method="composite">Điểm tổng hợp</button>
+              </div>
+            </div>
+            <div class="callout" id="priorityMethodNote" style="margin-bottom:1rem;"></div>
+            <div id="priorityTableWrap"></div>
+          </div>
+
+          <div class="card">
+            <h3>Phân bổ tiền dư</h3>
+            <div class="sub">Có một khoản tiền nhàn rỗi muốn trả thêm hôm nay? So sánh việc dồn hết vào khoản ưu tiên nhất với việc chia đều theo tỷ lệ dư nợ.</div>
+            <div class="row-controls">
+              <div class="field">
+                <label>Số tiền dư muốn phân bổ</label>
+                <input type="number" id="prio_extra_amount" placeholder="20000000" step="500000">
+              </div>
+              <button class="btn accent" id="prio_allocate_btn" style="height: 2.35rem;">Tính phân bổ</button>
+            </div>
+            <div id="priorityAllocResult" style="margin-top: 0.9rem;"></div>
+          </div>
+
+        </div>
+      </section>
+
       <!-- ---------- TIPS: VAY THÔNG MINH ---------- -->
       <section id="tab-tips" class="hidden">
 
@@ -676,6 +819,8 @@
   </div>
 </div>
 
+<div id="toastHost" aria-live="polite"></div>
+
 <script>
 /* ============================================================
    STATE
@@ -685,6 +830,7 @@ let loans = [];          // persisted loan definitions
 let activeLoanId = null; // for edit form
 let activeTab = 'dashboard';
 let simExtraByLoan = {}; // in-memory "what-if" extra payment config per loan id, not persisted
+let priorityMethod = 'avalanche'; // 'avalanche' | 'snowball' | 'composite'
 
 function loadLoans() {
   try {
@@ -697,11 +843,57 @@ function persistLoans() {
 }
 
 /* ============================================================
+   TOASTS + CONFIRM MODAL — thay cho alert()/confirm() mặc định
+   ============================================================ */
+const TOAST_ICONS = { error: '⚠️', success: '✓', warning: '⚠️', info: 'ℹ️' };
+function showToast(message, type = 'info', duration = 5000) {
+  const host = document.getElementById('toastHost');
+  if (!host) { console.warn(message); return; }
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="t-icon">${TOAST_ICONS[type] || 'ℹ️'}</span><span class="t-msg"></span><button class="t-close" aria-label="Đóng">✕</button>`;
+  el.querySelector('.t-msg').textContent = message;
+  const remove = () => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 160);
+  };
+  el.querySelector('.t-close').addEventListener('click', remove);
+  const timer = setTimeout(remove, duration);
+  el.addEventListener('mouseenter', () => clearTimeout(timer));
+  host.appendChild(el);
+}
+
+function showConfirm(message, { confirmLabel = 'Xoá', confirmClass = 'alert' } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'confirmOverlay';
+    overlay.innerHTML = `
+      <div class="confirm-box" role="alertdialog" aria-modal="true">
+        <div class="confirm-msg"></div>
+        <div class="form-actions">
+          <button class="btn ghost" id="confirmCancelBtn">Huỷ</button>
+          <button class="btn ${confirmClass}" id="confirmOkBtn">${confirmLabel}</button>
+        </div>
+      </div>`;
+    overlay.querySelector('.confirm-msg').textContent = message;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelector('#confirmOkBtn').addEventListener('click', () => cleanup(true));
+    overlay.querySelector('#confirmCancelBtn').addEventListener('click', () => cleanup(false));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+    document.addEventListener('keydown', function escHandler(e) {
+      if (e.key === 'Escape') { document.removeEventListener('keydown', escHandler); cleanup(false); }
+    });
+    overlay.querySelector('#confirmOkBtn').focus();
+  });
+}
+
+/* ============================================================
    EXPORT / IMPORT — backup toàn bộ khoản vay ra file JSON
    ============================================================ */
 function exportLoans() {
   try {
-    if (loans.length === 0) { alert('Chưa có khoản vay nào để export.'); return; }
+    if (loans.length === 0) { showToast('Chưa có khoản vay nào để export.', 'warning'); return; }
     const backup = {
       __meta: {
         app: 'Loan Ledger',
@@ -721,26 +913,25 @@ function exportLoans() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   } catch (e) {
-    alert('Export thất bại: ' + e.message);
+    showToast('Export thất bại: ' + e.message, 'error');
   }
 }
 
 function importLoans(file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       const parsed = JSON.parse(e.target.result);
       // Nhận cả file backup có __meta.loans lẫn file chỉ là mảng loans thuần
       const incoming = Array.isArray(parsed) ? parsed : parsed.loans;
       if (!Array.isArray(incoming) || incoming.length === 0) {
-        alert('File không hợp lệ hoặc không có khoản vay nào.');
+        showToast('File không hợp lệ hoặc không có khoản vay nào.', 'error');
         return;
       }
-      const ok = confirm(
-        `File chứa ${incoming.length} khoản vay.\n` +
-        `Toàn bộ danh mục vay hiện tại sẽ bị GHI ĐÈ.\n` +
-        `Tiếp tục?`
+      const ok = await showConfirm(
+        `File chứa ${incoming.length} khoản vay. Toàn bộ danh mục vay hiện tại sẽ bị ghi đè. Tiếp tục?`,
+        { confirmLabel: 'Ghi đè & khôi phục', confirmClass: 'accent' }
       );
       if (!ok) return;
       loans = incoming;
@@ -748,9 +939,9 @@ function importLoans(file) {
       activeLoanId = null;
       closeLoanForm();
       renderAll();
-      alert(`Đã khôi phục ${incoming.length} khoản vay.`);
+      showToast(`Đã khôi phục ${incoming.length} khoản vay.`, 'success');
     } catch (err) {
-      alert('Import thất bại: ' + err.message);
+      showToast('Import thất bại: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
@@ -1302,10 +1493,25 @@ function renderLoanCards() {
   }
   const typeLabel = { amortizing: 'Đều kỳ', declining: 'Gốc đều', interest_only: 'Lãi trước' };
 
+  const today = new Date();
   container.innerHTML = loans.map(loan => {
     const sched = getLoanSchedule(loan);
     const { balance } = balanceAsOfToday(loan);
     const paidPct = Math.max(0, Math.min(100, (1 - balance / loan.principal) * 100));
+
+    let statusHtml = '';
+    if (paidPct >= 99.95) {
+      statusHtml = `<span class="status-pill done">Đã tất toán</span>`;
+    } else {
+      const nextUnpaid = sched.payments.find(p => daysBetween(today, p.date) > -3);
+      if (nextUnpaid) {
+        const d = daysBetween(today, nextUnpaid.date);
+        if (d < 0) statusHtml = `<span class="status-pill overdue">Quá hạn ${Math.abs(d)} ngày</span>`;
+        else if (d <= 7) statusHtml = `<span class="status-pill soon">Còn ${d} ngày</span>`;
+        else statusHtml = `<span class="status-pill ok">${formatDateVN(nextUnpaid.date)}</span>`;
+      }
+    }
+
     return `
       <div class="loan-card ${loan.id === activeLoanId ? 'active' : ''}" data-loan-id="${loan.id}">
         <div class="name">
@@ -1317,6 +1523,7 @@ function renderLoanCards() {
           <span>${pct(paidPct, 0)}</span>
         </div>
         <div class="bar-track"><div class="bar-fill" style="width:${paidPct.toFixed(1)}%"></div></div>
+        <div class="card-status-row">${statusHtml}</div>
       </div>
     `;
   }).join('');
@@ -1351,7 +1558,7 @@ function copyToClipboard(text, btnEl) {
     btnEl.disabled = true;
     setTimeout(() => { btnEl.textContent = orig; btnEl.disabled = false; }, 1600);
   };
-  const onFail = () => alert('Không copy tự động được — hãy chọn và copy thủ công đoạn text vừa hiện ra.');
+  const onFail = () => showToast('Không copy tự động được — hãy chọn và copy thủ công đoạn text vừa hiện ra.', 'warning');
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(onDone).catch(() => fallbackCopyToClipboard(text, onDone, onFail));
   } else {
@@ -1509,6 +1716,9 @@ function openLoanForm(loanId) {
     document.getElementById('f_early_type').value = (ef && ef.enabled) ? ef.type : 'none';
     document.getElementById('f_early_value').value = ef ? (ef.value || '') : '';
     document.getElementById('f_early_until').value = ef ? (ef.applicableUntilMonth || '') : '';
+
+    document.getElementById('f_late_section').open = !!(lf && lf.enabled);
+    document.getElementById('f_early_section').open = !!(ef && ef.enabled);
   } else {
     title.textContent = 'Khoản vay mới';
     document.getElementById('f_name').value = '';
@@ -1529,6 +1739,9 @@ function openLoanForm(loanId) {
     document.getElementById('f_early_type').value = 'none';
     document.getElementById('f_early_value').value = '';
     document.getElementById('f_early_until').value = '';
+
+    document.getElementById('f_late_section').open = false;
+    document.getElementById('f_early_section').open = false;
   }
   updateLateFieldVisibility();
   updateEarlyFieldVisibility();
@@ -1577,11 +1790,13 @@ function updateLateFieldVisibility() {
   document.getElementById('f_late_mult_wrap').classList.toggle('hidden', t !== 'daily_penalty');
   document.getElementById('f_late_fixed_wrap').classList.toggle('hidden', t !== 'fixed');
   document.getElementById('f_late_pct_wrap').classList.toggle('hidden', t !== 'percent');
+  document.getElementById('f_late_badge').classList.toggle('hidden', t === 'none');
 }
 
 function updateEarlyFieldVisibility() {
   const t = document.getElementById('f_early_type').value;
   document.getElementById('f_early_val_wrap').classList.toggle('hidden', t === 'none');
+  document.getElementById('f_early_badge').classList.toggle('hidden', t === 'none');
 }
 
 function saveLoanFromForm() {
@@ -1595,12 +1810,13 @@ function saveLoanFromForm() {
   const lateFeeConfig = buildLateFeeConfig();
   const earlyPayoffFeeConfig = buildEarlyPayoffFeeConfig();
 
-  if (!name) { alert('Nhập tên khoản vay.'); return; }
-  if (isNaN(principal) || principal <= 0) { alert('Số tiền gốc phải lớn hơn 0.'); return; }
-  if (isNaN(ratePct) || ratePct < 0) { alert('Lãi suất không hợp lệ.'); return; }
-  if (isNaN(termMonths) || termMonths <= 0) { alert('Kỳ hạn (tháng) phải lớn hơn 0.'); return; }
-  if (!startDate) { alert('Chọn ngày bắt đầu.'); return; }
+  if (!name) { showToast('Nhập tên khoản vay.', 'error'); return; }
+  if (isNaN(principal) || principal <= 0) { showToast('Số tiền gốc phải lớn hơn 0.', 'error'); return; }
+  if (isNaN(ratePct) || ratePct < 0) { showToast('Lãi suất không hợp lệ.', 'error'); return; }
+  if (isNaN(termMonths) || termMonths <= 0) { showToast('Kỳ hạn (tháng) phải lớn hơn 0.', 'error'); return; }
+  if (!startDate) { showToast('Chọn ngày bắt đầu.', 'error'); return; }
 
+  const wasEditing = !!activeLoanId;
   if (activeLoanId) {
     const loan = loans.find(l => l.id === activeLoanId);
     Object.assign(loan, { name, principal, ratePct, termMonths, startDate, repaymentType, currency, lateFeeConfig, earlyPayoffFeeConfig });
@@ -1614,15 +1830,22 @@ function saveLoanFromForm() {
   persistLoans();
   closeLoanForm();
   renderAll();
+  showToast(wasEditing ? `Đã cập nhật "${name}".` : `Đã thêm khoản vay "${name}".`, 'success');
 }
 
-function deleteActiveLoan() {
+async function deleteActiveLoan() {
   if (!activeLoanId) return;
-  if (!confirm('Xoá khoản vay này?')) return;
+  const loan = loans.find(l => l.id === activeLoanId);
+  const ok = await showConfirm(
+    `Xoá khoản vay "${loan ? loan.name : ''}"? Thao tác này không thể hoàn tác.`,
+    { confirmLabel: 'Xoá khoản vay', confirmClass: 'alert' }
+  );
+  if (!ok) return;
   loans = loans.filter(l => l.id !== activeLoanId);
   persistLoans();
   closeLoanForm();
   renderAll();
+  showToast('Đã xoá khoản vay.', 'success');
 }
 
 /* ============================================================
@@ -1638,6 +1861,47 @@ function switchTab(tab) {
   if (tab === 'payoff') renderPayoffTab();
   if (tab === 'extra') renderExtraTab();
   if (tab === 'decode') renderDecodeTab();
+  if (tab === 'priority') renderPriorityTab();
+  renderGlanceStrip();
+}
+
+/* ============================================================
+   RENDER: QUICK-GLANCE STRIP (always visible, across all tabs)
+   ============================================================ */
+function renderGlanceStrip() {
+  const host = document.getElementById('glanceStrip');
+  if (loans.length === 0) { host.innerHTML = ''; return; }
+
+  const today = new Date();
+  const upcoming = getUpcomingPayments(200).filter(u => daysBetween(today, u.payment.date) > -3);
+  const overdue = upcoming.filter(u => daysBetween(today, u.payment.date) < 0);
+  const next = upcoming.find(u => daysBetween(today, u.payment.date) >= 0);
+
+  let mood = 'ok', icon = '✓', text;
+  if (overdue.length > 0) {
+    mood = 'overdue'; icon = '⚠️';
+    const totalOverdue = overdue.reduce((s, u) => s + u.payment.payment, 0);
+    text = `<strong>${overdue.length} kỳ đang quá hạn</strong> — tổng ${numberFmt.format(Math.round(totalOverdue))}. Kiểm tra tab "Tất toán sớm" hoặc ghi nhận lại lịch sử trả thực tế.`;
+  } else if (next && daysBetween(today, next.payment.date) <= 7) {
+    mood = 'soon'; icon = '⏰';
+    const d = daysBetween(today, next.payment.date);
+    text = `Kỳ trả gần nhất: <strong>${escapeHtml(next.loan.name)}</strong> — ${money(next.loan, next.payment.payment)}, ${d === 0 ? 'hôm nay' : `còn ${d} ngày`} (${formatDateVN(next.payment.date)}).`;
+  } else if (next) {
+    text = `Kỳ trả gần nhất: <strong>${escapeHtml(next.loan.name)}</strong> — ${money(next.loan, next.payment.payment)} vào ${formatDateVN(next.payment.date)}.`;
+  } else {
+    text = 'Không có kỳ trả nợ nào sắp tới — mọi khoản vay đã tất toán hoặc chưa có lịch.';
+  }
+
+  host.innerHTML = `
+    <div class="glance glance-${mood}">
+      <span class="glance-icon">${icon}</span>
+      <span class="glance-text">${text}</span>
+      ${activeTab !== 'dashboard' ? '<button class="btn small ghost" id="glanceGoDashboard">Xem tổng quan</button>' : ''}
+    </div>`;
+  const goBtn = document.getElementById('glanceGoDashboard');
+  if (goBtn) goBtn.addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-tab="dashboard"]').click();
+  });
 }
 
 /* ============================================================
@@ -1870,7 +2134,7 @@ function renderPayoffTab() {
     if (!loan) return;
     const amount = parseFloat(document.getElementById('ph_amount').value);
     const date = phDate.value;
-    if (!date || isNaN(amount) || amount <= 0) { alert('Nhập ngày và số tiền hợp lệ.'); return; }
+    if (!date || isNaN(amount) || amount <= 0) { showToast('Nhập ngày và số tiền hợp lệ.', 'error'); return; }
     if (!loan.paymentHistory) loan.paymentHistory = [];
     loan.paymentHistory.push({ date, amount });
     persistLoans();
@@ -1936,12 +2200,12 @@ function renderExtraTab() {
     if (mode === 'once') {
       const amount = parseFloat(document.getElementById('extra_once_amount').value);
       const date = document.getElementById('extra_once_date').value;
-      if (isNaN(amount) || amount <= 0) { alert('Nhập số tiền trả thêm hợp lệ.'); return; }
+      if (isNaN(amount) || amount <= 0) { showToast('Nhập số tiền trả thêm hợp lệ.', 'error'); return; }
       extraConfig = { mode: 'once', date, amount };
     } else {
       const amount = parseFloat(document.getElementById('extra_recurring_amount').value);
       const fromPeriod = parseInt(document.getElementById('extra_recurring_from').value, 10) || 1;
-      if (isNaN(amount) || amount <= 0) { alert('Nhập số tiền trả thêm hợp lệ.'); return; }
+      if (isNaN(amount) || amount <= 0) { showToast('Nhập số tiền trả thêm hợp lệ.', 'error'); return; }
       extraConfig = { mode: 'recurring', fromPeriod, amount };
     }
     renderExtraComparison(loan, extraConfig);
@@ -1984,10 +2248,10 @@ function renderDecodeTab() {
     const N = parseInt(document.getElementById('dec_term').value, 10);
     const cur = document.getElementById('dec_currency').value.trim() || '₫';
 
-    if (isNaN(P) || P <= 0) { alert('Nhập số tiền vay.'); return; }
-    if (isNaN(PMT) || PMT <= 0) { alert('Nhập số tiền trả mỗi kỳ.'); return; }
-    if (isNaN(N) || N <= 0) { alert('Nhập kỳ hạn.'); return; }
-    if (PMT * N < P) { alert('Tổng số tiền trả nhỏ hơn số tiền vay — số liệu không hợp lý, kiểm tra lại.'); return; }
+    if (isNaN(P) || P <= 0) { showToast('Nhập số tiền vay.', 'error'); return; }
+    if (isNaN(PMT) || PMT <= 0) { showToast('Nhập số tiền trả mỗi kỳ.', 'error'); return; }
+    if (isNaN(N) || N <= 0) { showToast('Nhập kỳ hạn.', 'error'); return; }
+    if (PMT * N < P) { showToast('Tổng số tiền trả nhỏ hơn số tiền vay — số liệu không hợp lý, kiểm tra lại.', 'error'); return; }
 
     const r = decodeContract(P, PMT, N, cur);
     renderDecodeResult(r);
@@ -2124,14 +2388,143 @@ function renderDecodeResult(r) {
     });
     persistLoans();
     renderAll();
-    alert('Đã lưu. Vào form sửa khoản vay để cấu hình thêm phí trả chậm / phí tất toán sớm nếu hợp đồng có quy định, rồi dùng ở phần So sánh kịch bản bên dưới.');
+    showToast('Đã lưu. Vào form sửa khoản vay để cấu hình thêm phí trả chậm / phí tất toán sớm nếu hợp đồng có quy định, rồi dùng ở phần So sánh kịch bản bên dưới.', 'success', 7000);
     populateLoanSelect(document.getElementById('scn_loan'), false);
   };
 }
 
+/* ============================================================
+   RENDER: PRIORITY TAB — xếp hạng khoản vay nên trả trước
+   ============================================================ */
+function computeLoanPriorityMetrics() {
+  const todayStr = toDateInputValue(new Date());
+  const metrics = loans.map(loan => {
+    const { balance } = balanceAsOfToday(loan);
+    const monthlyInterestCost = balance * ((loan.ratePct / 100) / 12);
+    const payoffQuote = calculatePayoffWithFee(loan, todayStr);
+    return {
+      loan,
+      balance,
+      monthlyInterestCost,
+      earlyPayoffFee: payoffQuote.earlyPayoffFee || 0,
+      feeDescription: payoffQuote.feeDescription,
+      feePctOfBalance: balance > 0 ? (payoffQuote.earlyPayoffFee || 0) / balance : 0
+    };
+  }).filter(m => m.balance > 0.5); // bỏ khoản đã tất toán
+
+  const maxRate = Math.max(...metrics.map(m => m.loan.ratePct), 0.0001);
+  const maxBalance = Math.max(...metrics.map(m => m.balance), 1);
+  metrics.forEach(m => {
+    const rateScore = m.loan.ratePct / maxRate;
+    const smallBalanceScore = 1 - (m.balance / maxBalance);
+    const feePenalty = m.feePctOfBalance; // 0..~0.05 thường
+    m.compositeScore = rateScore * 0.6 + smallBalanceScore * 0.25 - feePenalty * 3 * 0.15;
+  });
+  return metrics;
+}
+
+function sortedPriorityMetrics(method) {
+  const metrics = computeLoanPriorityMetrics();
+  if (method === 'avalanche') metrics.sort((a, b) => b.loan.ratePct - a.loan.ratePct);
+  else if (method === 'snowball') metrics.sort((a, b) => a.balance - b.balance);
+  else metrics.sort((a, b) => b.compositeScore - a.compositeScore);
+  return metrics;
+}
+
+const PRIORITY_METHOD_NOTES = {
+  avalanche: 'Trả khoản lãi suất cao nhất trước. Về mặt toán học đây luôn là cách tiết kiệm nhiều tiền lãi nhất — đúng thứ tự dân tài chính sẽ chọn nếu chỉ nhìn vào con số.',
+  snowball: 'Trả khoản dư nợ nhỏ nhất trước để tất toán nhanh, tạo cảm giác hoàn thành và giữ động lực — tốn thêm ít lãi hơn avalanche nhưng dễ duy trì kỷ luật hơn nếu cậu dễ nản.',
+  composite: 'Kết hợp lãi suất, quy mô dư nợ, và trừ điểm nếu khoản đó đang trong thời gian bị phạt phí tất toán sớm nặng — tránh gợi ý dồn tiền vào đúng lúc phí phạt ăn hết phần lãi tiết kiệm được.'
+};
+
+function renderPriorityTab() {
+  const hasLoans = loans.filter(l => balanceAsOfToday(l).balance > 0.5).length > 0;
+  document.getElementById('priorityEmpty').classList.toggle('hidden', hasLoans);
+  document.getElementById('priorityContent').classList.toggle('hidden', !hasLoans);
+  if (!hasLoans) return;
+
+  document.getElementById('priorityMethodNote').textContent = PRIORITY_METHOD_NOTES[priorityMethod];
+
+  const ranked = sortedPriorityMetrics(priorityMethod);
+  const rows = ranked.map((m, i) => {
+    const feeNote = m.earlyPayoffFee > 0
+      ? `<span style="color:var(--alert);">${money(m.loan, m.earlyPayoffFee)}</span> <span class="hint" style="display:inline;">(${m.feeDescription})</span>`
+      : '<span style="color:var(--ink-faint);">Không phí</span>';
+    let suggestion;
+    if (i === 0) suggestion = '★ Ưu tiên #1 — đổ tiền dư vào đây trước';
+    else if (m.feePctOfBalance > 0.015) suggestion = 'Đang bị phạt tất toán sớm khá nặng — cân nhắc đợi qua giai đoạn áp phí';
+    else suggestion = `Ưu tiên #${i + 1}`;
+    return `
+      <tr ${i === 0 ? 'style="background: var(--accent-soft);"' : ''}>
+        <td style="text-align:left; font-weight:700;">#${i + 1}</td>
+        <td style="text-align:left; font-weight:600;">${escapeHtml(m.loan.name)}</td>
+        <td>${m.loan.ratePct}%/năm</td>
+        <td>${money(m.loan, m.balance)}</td>
+        <td style="color:var(--alert);">${money(m.loan, Math.round(m.monthlyInterestCost))}</td>
+        <td>${feeNote}</td>
+        <td style="text-align:left;">${suggestion}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('priorityTableWrap').innerHTML = `
+    <div class="table-scroll">
+      <table class="ledger">
+        <thead><tr>
+          <th style="text-align:left;">Hạng</th><th style="text-align:left;">Khoản vay</th><th>Lãi suất</th>
+          <th>Dư nợ còn lại</th><th>Chi phí lãi/tháng</th><th>Phí tất toán sớm hôm nay</th><th style="text-align:left;">Gợi ý</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function allocateExtraToPriority() {
+  const amount = parseFloat(document.getElementById('prio_extra_amount').value);
+  if (isNaN(amount) || amount <= 0) { showToast('Nhập số tiền dư hợp lệ.', 'error'); return; }
+
+  const ranked = sortedPriorityMetrics(priorityMethod).filter(m => m.balance > 0.5);
+  if (ranked.length === 0) return;
+  const todayStr = toDateInputValue(new Date());
+
+  // Kịch bản A: dồn hết vào khoản ưu tiên #1
+  const top = ranked[0];
+  const scnTop = generateScenario(top.loan, { extraConfig: { mode: 'once', date: todayStr, amount } });
+
+  // Kịch bản B: chia đều theo tỷ lệ dư nợ trên toàn danh mục
+  const totalBalance = ranked.reduce((s, m) => s + m.balance, 0);
+  let interestSavedSplit = 0;
+  const splitDetails = ranked.map(m => {
+    const share = Math.round(amount * (m.balance / totalBalance));
+    if (share <= 0) return { loan: m.loan, share: 0, interestSaved: 0 };
+    const scn = generateScenario(m.loan, { extraConfig: { mode: 'once', date: todayStr, amount: share } });
+    interestSavedSplit += scn.interestSaved;
+    return { loan: m.loan, share, interestSaved: scn.interestSaved };
+  });
+
+  const diff = scnTop.interestSaved - interestSavedSplit;
+  const cur = top.loan.currency || '₫';
+  const fmt = (v) => numberFmt.format(Math.round(v));
+
+  document.getElementById('priorityAllocResult').innerHTML = `
+    <div class="kv-grid" style="margin-bottom:1rem;">
+      <div class="k">Phương án A — dồn hết vào "${escapeHtml(top.loan.name)}" (ưu tiên #1)</div>
+      <div class="v" style="color:var(--accent);">Tiết kiệm ${fmt(scnTop.interestSaved)} ${cur} lãi, rút ngắn ${scnTop.monthsSaved} kỳ</div>
+      <div class="k">Phương án B — chia đều theo tỷ lệ dư nợ cho ${ranked.length} khoản</div>
+      <div class="v" style="color:var(--accent);">Tiết kiệm tổng ${fmt(interestSavedSplit)} ${cur} lãi</div>
+    </div>
+    <div class="callout ${diff >= 0 ? 'accent' : 'alert'}">
+      ${diff >= 0
+        ? `Dồn hết vào khoản ưu tiên #1 tiết kiệm hơn <span class="big">${fmt(Math.abs(diff))} ${cur}</span> so với chia đều.`
+        : `Trong trường hợp này chia đều lại tiết kiệm hơn <span class="big">${fmt(Math.abs(diff))} ${cur}</span> — thường xảy ra khi khoản #1 gần hết dư nợ nên "hết chỗ" nhận thêm tiền, phần dư tràn sang khoản khác đã tính vào phương án A.`}
+    </div>
+    <div class="hint" style="margin-top:0.6rem;">Chi tiết chia đều: ${splitDetails.filter(d => d.share > 0).map(d => `${escapeHtml(d.loan.name)} +${fmt(d.share)} (${fmt(d.interestSaved)} lãi tiết kiệm)`).join(' · ')}</div>
+  `;
+}
+
 function runScenarioComparison() {
   const loan = loans.find(l => l.id === document.getElementById('scn_loan').value);
-  if (!loan) { alert('Chọn khoản vay.'); return; }
+  if (!loan) { showToast('Chọn khoản vay.', 'error'); return; }
   const fmt = (v) => numberFmt.format(Math.round(v)) + ' ' + (loan.currency || '₫');
 
   const scenarios = [generateScenario(loan, { name: '① Trả đúng hạn' })];
@@ -2140,7 +2533,7 @@ function runScenarioComparison() {
   const lateDays = parseInt(document.getElementById('scn_late_days').value, 10);
   if (!isNaN(latePeriods) && !isNaN(lateDays) && latePeriods > 0 && lateDays > 0) {
     if (!loan.lateFeeConfig || !loan.lateFeeConfig.enabled) {
-      alert('Khoản vay này chưa cấu hình phí trả chậm — vào form sửa khoản vay để thêm, nếu không kịch bản "Trễ hạn" sẽ không tính ra phí phạt nào.');
+      showToast('Khoản vay này chưa cấu hình phí trả chậm — vào form sửa khoản vay để thêm, nếu không kịch bản "Trễ hạn" sẽ không tính ra phí phạt nào.', 'warning', 7000);
     }
     const latePayments = [];
     for (let i = 1; i <= Math.min(latePeriods, loan.termMonths); i++) latePayments.push({ period: i, daysLate: lateDays });
@@ -2243,12 +2636,14 @@ function renderSensitivitySection(loan) {
    INIT
    ============================================================ */
 function renderAll() {
+  renderGlanceStrip();
   renderLoanCards();
   renderDashboard();
   if (activeTab === 'schedule') renderScheduleTab();
   if (activeTab === 'payoff') renderPayoffTab();
   if (activeTab === 'extra') renderExtraTab();
   if (activeTab === 'decode') renderDecodeTab();
+  if (activeTab === 'priority') renderPriorityTab();
 }
 
 function init() {
@@ -2257,7 +2652,7 @@ function init() {
 
   document.getElementById('newLoanBtn').addEventListener('click', () => openLoanForm(null));
   document.getElementById('copyPortfolioBtn').addEventListener('click', (e) => {
-    if (loans.length === 0) { alert('Chưa có khoản vay nào để copy.'); return; }
+    if (loans.length === 0) { showToast('Chưa có khoản vay nào để copy.', 'warning'); return; }
     copyToClipboard(buildPortfolioContextText(), e.currentTarget);
   });
   document.getElementById('cancelFormBtn').addEventListener('click', closeLoanForm);
@@ -2276,6 +2671,16 @@ function init() {
 
   document.getElementById('f_late_type').addEventListener('change', updateLateFieldVisibility);
   document.getElementById('f_early_type').addEventListener('change', updateEarlyFieldVisibility);
+
+  document.querySelectorAll('#priority_method_seg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#priority_method_seg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      priorityMethod = btn.dataset.method;
+      renderPriorityTab();
+    });
+  });
+  document.getElementById('prio_allocate_btn').addEventListener('click', allocateExtraToPriority);
 
   // Add a delete button dynamically inside the form actions when editing
   const formActions = document.querySelector('.form-actions');
