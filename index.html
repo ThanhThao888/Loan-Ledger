@@ -222,6 +222,31 @@
   .chart-mini-legend .item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; color: var(--ink-soft); font-family: var(--mono); }
   .chart-mini-legend .dot { width: 8px; height: 8px; border-radius: 2px; }
 
+  /* Score tool */
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+  .score-grid .field .pull-btn { margin-top: 0.3rem; align-self: flex-start; }
+  .weight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.9rem 1.3rem; margin: 0.9rem 0 1.1rem; padding: 0.9rem 1rem; background: var(--paper); border: 1px solid var(--line-soft); border-radius: var(--radius); }
+  .weight-item label { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-soft); font-weight: 600; margin-bottom: 0.3rem; }
+  .weight-item label .wpct { font-family: var(--mono); color: var(--ink); }
+  .weight-item input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .score-result { display: flex; flex-wrap: wrap; gap: 1.6rem; align-items: flex-start; margin-top: 0.3rem; }
+  .score-gauge { flex: 0 0 auto; text-align: center; }
+  .score-verdict-tag { display: inline-block; margin-top: 0.5rem; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.74rem; font-weight: 700; font-family: var(--mono); }
+  .score-verdict-tag.strong { background: var(--accent-soft); color: var(--accent); }
+  .score-verdict-tag.ok { background: var(--gold-soft); color: var(--gold); }
+  .score-verdict-tag.weak { background: var(--alert-soft); color: var(--alert); }
+  .score-factors { flex: 1 1 280px; min-width: 260px; display: flex; flex-direction: column; gap: 0.65rem; }
+  .sf-row .sf-top { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 0.25rem; }
+  .sf-row .sf-top .sf-name { font-weight: 600; }
+  .sf-row .sf-top .sf-name .sf-weight { font-weight: 400; color: var(--ink-faint); font-family: var(--mono); font-size: 0.68rem; margin-left: 0.3rem; }
+  .sf-row .sf-top .sf-score { font-family: var(--mono); color: var(--ink-soft); }
+  .sf-track { height: 8px; background: var(--line-soft); border-radius: 4px; overflow: hidden; }
+  .sf-fill { height: 100%; border-radius: 4px; transition: width 0.15s ease; }
+  .score-flag { margin-top: 1rem; padding: 0.85rem 1rem; border-radius: var(--radius); font-size: 0.83rem; line-height: 1.5; }
+  .score-suggestions { margin-top: 1rem; }
+  .score-suggestions h4 { font-size: 0.82rem; margin-bottom: 0.5rem; }
+  .score-suggestions ul { padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.83rem; line-height: 1.5; }
+
   /* Upcoming payments list */
   .pay-list { display: flex; flex-direction: column; }
   .pay-row {
@@ -675,6 +700,65 @@
 
       <!-- ---------- TIPS: VAY THÔNG MINH ---------- -->
       <section id="tab-tips" class="hidden">
+
+        <div class="card">
+          <h3>🧮 Tự chấm điểm hồ sơ vay</h3>
+          <div class="sub">Nhập thông tin của bạn — điểm sẽ tự cập nhật theo 4 tiêu chí ngân hàng hay xét, có trọng số điều chỉnh được. Đây là công cụ ước lượng tham khảo dựa trên các ngưỡng phổ biến ở Việt Nam, không phải kết quả thẩm định thật của bất kỳ ngân hàng nào — mỗi nơi có khẩu vị rủi ro riêng.</div>
+
+          <div class="score-grid">
+            <div class="field">
+              <label>Thu nhập ròng hàng tháng (đ)</label>
+              <input type="number" id="sc_income" placeholder="20000000" step="500000" min="0">
+            </div>
+            <div class="field">
+              <label>Loại thu nhập</label>
+              <select id="sc_income_type">
+                <option value="fixed">Lương cố định</option>
+                <option value="variable">Kinh doanh / hoa hồng</option>
+                <option value="freelance">Freelance / thời vụ</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tổng nợ phải trả hàng tháng hiện tại (đ)</label>
+              <input type="number" id="sc_existing_debt" placeholder="0" step="100000" min="0">
+              <button type="button" class="btn small ghost pull-btn" id="sc_pull_debt_btn">↺ Tính từ khoản vay trong app</button>
+            </div>
+            <div class="field">
+              <label>Khoản vay mới dự kiến trả/tháng (đ, tuỳ chọn)</label>
+              <input type="number" id="sc_new_payment" placeholder="0" step="100000" min="0">
+            </div>
+            <div class="field">
+              <label>Điểm CIC (thang phổ biến 300–850)</label>
+              <input type="number" id="sc_cic" placeholder="650" step="1" min="300" max="850">
+            </div>
+            <div class="field">
+              <label>Nhóm nợ hiện tại (nếu biết)</label>
+              <select id="sc_debt_group">
+                <option value="none">Không có / không biết</option>
+                <option value="1">Nhóm 1 — đủ tiêu chuẩn</option>
+                <option value="2">Nhóm 2 — cần chú ý (quá hạn 10–90 ngày)</option>
+                <option value="3">Nhóm 3 — dưới tiêu chuẩn (nợ xấu)</option>
+                <option value="4">Nhóm 4 — nghi ngờ (nợ xấu)</option>
+                <option value="5">Nhóm 5 — có khả năng mất vốn (nợ xấu)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Thời gian làm việc / kinh doanh hiện tại (tháng)</label>
+              <input type="number" id="sc_tenure" placeholder="24" step="1" min="0">
+            </div>
+            <div class="field">
+              <label>Tài sản đảm bảo</label>
+              <select id="sc_collateral">
+                <option value="none">Không — vay tín chấp</option>
+                <option value="has">Có — thế chấp (sổ đỏ, ô tô...)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="weight-grid" id="scoreWeightGrid"></div>
+
+          <div id="scoreResultWrap"></div>
+        </div>
 
         <div class="card">
           <h3>🧠 Think Like a Banker — góc nhìn của người xét duyệt</h3>
@@ -1550,6 +1634,180 @@ function buildBalanceAreaSVG(points, opts = {}) {
     ${dots}
     ${xLabels}
   </svg>`;
+}
+
+/* ============================================================
+   TỰ CHẤM ĐIỂM HỒ SƠ VAY — công cụ tham khảo, không phải kết quả
+   thẩm định chính thức. Trọng số mặc định lấy cảm hứng từ cách các
+   mô hình chấm điểm tín dụng phổ biến phân bổ (lịch sử trả nợ nặng
+   ký nhất, kế đến là tỉ lệ nợ/thu nhập), điều chỉnh được bằng thanh trượt.
+   ============================================================ */
+const SCORE_WEIGHT_DEFS = [
+  { key: 'dti', label: 'DTI (nợ / thu nhập)', color: 'var(--accent)', defaultWeight: 35 },
+  { key: 'cic', label: 'Điểm CIC', color: 'var(--gold)', defaultWeight: 30 },
+  { key: 'income', label: 'Thu nhập', color: 'var(--alert)', defaultWeight: 20 },
+  { key: 'tenure', label: 'Thâm niên công việc', color: 'var(--ink-soft)', defaultWeight: 15 }
+];
+let scoreWeights = { dti: 35, cic: 30, income: 20, tenure: 15 };
+
+// Piecewise-linear interpolation: points = [[x0,y0],[x1,y1],...] ascending by x
+function interpScore(value, points) {
+  if (value <= points[0][0]) return points[0][1];
+  const last = points[points.length - 1];
+  if (value >= last[0]) return last[1];
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x0, y0] = points[i], [x1, y1] = points[i + 1];
+    if (value >= x0 && value <= x1) {
+      const t = (value - x0) / (x1 - x0);
+      return y0 + t * (y1 - y0);
+    }
+  }
+  return last[1];
+}
+
+function scoreDTI(dtiPct) {
+  return interpScore(dtiPct, [[0, 100], [30, 96], [40, 82], [50, 58], [60, 30], [75, 10], [100, 0]]);
+}
+function scoreCIC(cic) {
+  return interpScore(cic, [[300, 4], [430, 15], [500, 30], [580, 50], [650, 70], [700, 85], [750, 93], [800, 98], [850, 100]]);
+}
+function scoreIncome(incomeVND, incomeType) {
+  const trieu = incomeVND / 1000000;
+  const base = interpScore(trieu, [[0, 8], [5, 20], [8, 32], [15, 55], [20, 66], [30, 80], [50, 92], [80, 98], [150, 100]]);
+  const mult = incomeType === 'variable' ? 0.85 : (incomeType === 'freelance' ? 0.75 : 1);
+  return Math.max(0, Math.min(100, base * mult));
+}
+function scoreTenure(months) {
+  return interpScore(months, [[0, 8], [3, 20], [6, 35], [12, 55], [24, 72], [36, 85], [60, 95], [120, 100]]);
+}
+
+function normalizedWeights() {
+  const total = SCORE_WEIGHT_DEFS.reduce((s, d) => s + (scoreWeights[d.key] || 0), 0) || 1;
+  const out = {};
+  SCORE_WEIGHT_DEFS.forEach(d => { out[d.key] = (scoreWeights[d.key] || 0) / total; });
+  return out;
+}
+
+function renderScoreWeightGrid() {
+  const el = document.getElementById('scoreWeightGrid');
+  const norm = normalizedWeights();
+  el.innerHTML = SCORE_WEIGHT_DEFS.map(d => `
+    <div class="weight-item">
+      <label>${d.label} <span class="wpct">${(norm[d.key] * 100).toFixed(0)}%</span></label>
+      <input type="range" min="0" max="100" value="${scoreWeights[d.key]}" data-weight-key="${d.key}">
+    </div>
+  `).join('');
+  el.querySelectorAll('[data-weight-key]').forEach(input => {
+    input.addEventListener('input', () => {
+      scoreWeights[input.dataset.weightKey] = parseInt(input.value, 10);
+      renderScoreWeightGrid();
+      computeAndRenderScore();
+    });
+  });
+}
+
+function pullDebtFromApp() {
+  if (loans.length === 0) {
+    alert('Chưa có khoản vay nào trong app để tính.');
+    return;
+  }
+  let total = 0;
+  loans.forEach(loan => {
+    const sched = getLoanSchedule(loan);
+    const paidPeriods = Array.isArray(loan.paidPeriods) ? loan.paidPeriods : [];
+    const nextUnpaid = sched.payments.find(p => !paidPeriods.includes(p.period));
+    if (nextUnpaid) total += nextUnpaid.payment;
+  });
+  document.getElementById('sc_existing_debt').value = Math.round(total);
+  computeAndRenderScore();
+}
+
+function computeAndRenderScore() {
+  const resultWrap = document.getElementById('scoreResultWrap');
+  const income = parseFloat(document.getElementById('sc_income').value) || 0;
+  const incomeType = document.getElementById('sc_income_type').value;
+  const existingDebt = parseFloat(document.getElementById('sc_existing_debt').value) || 0;
+  const newPayment = parseFloat(document.getElementById('sc_new_payment').value) || 0;
+  const cic = document.getElementById('sc_cic').value === '' ? null : parseFloat(document.getElementById('sc_cic').value);
+  const debtGroup = document.getElementById('sc_debt_group').value;
+  const tenure = document.getElementById('sc_tenure').value === '' ? null : parseFloat(document.getElementById('sc_tenure').value);
+  const collateral = document.getElementById('sc_collateral').value;
+
+  if (!income && cic === null && tenure === null && !existingDebt) {
+    resultWrap.innerHTML = `<div class="empty-note" style="padding:1.2rem 0;">Nhập thông tin ở trên để xem điểm đánh giá.</div>`;
+    return;
+  }
+
+  const dtiPct = income > 0 ? ((existingDebt + newPayment) / income) * 100 : 100;
+  const factors = {
+    dti: scoreDTI(dtiPct),
+    cic: cic === null ? 50 : scoreCIC(cic),
+    income: scoreIncome(income, incomeType),
+    tenure: tenure === null ? 40 : scoreTenure(tenure)
+  };
+  const norm = normalizedWeights();
+  let total = SCORE_WEIGHT_DEFS.reduce((s, d) => s + factors[d.key] * norm[d.key], 0);
+  if (collateral === 'has') total = Math.min(100, total + 4);
+  total = Math.round(total);
+
+  const isBadDebt = debtGroup === '3' || debtGroup === '4' || debtGroup === '5';
+
+  let verdictClass = 'weak', verdictText = 'Hồ sơ yếu — rủi ro bị từ chối cao';
+  if (total >= 80) { verdictClass = 'strong'; verdictText = 'Hồ sơ mạnh — nhiều khả năng được duyệt, có thể đàm phán lãi suất tốt'; }
+  else if (total >= 65) { verdictClass = 'strong'; verdictText = 'Hồ sơ khá — nhiều khả năng được duyệt'; }
+  else if (total >= 45) { verdictClass = 'ok'; verdictText = 'Hồ sơ trung bình — có thể được duyệt nhưng lãi suất/hạn mức kém ưu đãi hơn'; }
+
+  const gaugeColor = total >= 65 ? 'var(--accent)' : (total >= 45 ? 'var(--gold)' : 'var(--alert)');
+  const gaugeSvg = buildDonutSVG(
+    [{ label: 'Điểm', value: total, color: gaugeColor }, { label: 'Còn lại', value: 100 - total, color: 'var(--line-soft)', valueLabel: '' }],
+    { size: 140, stroke: 16, centerLabel: String(total), centerSub: '/ 100' }
+  );
+
+  const factorRows = SCORE_WEIGHT_DEFS.map(d => {
+    const v = Math.round(factors[d.key]);
+    const barColor = v >= 65 ? 'var(--accent)' : (v >= 45 ? 'var(--gold)' : 'var(--alert)');
+    return `
+      <div class="sf-row">
+        <div class="sf-top">
+          <span class="sf-name">${d.label}<span class="sf-weight">trọng số ${(norm[d.key] * 100).toFixed(0)}%</span></span>
+          <span class="sf-score">${v}/100</span>
+        </div>
+        <div class="sf-track"><div class="sf-fill" style="width:${v}%; background:${barColor};"></div></div>
+      </div>`;
+  }).join('');
+
+  // Suggestions for weak factors
+  const suggestions = [];
+  if (factors.dti < 65) suggestions.push(`DTI hiện khoảng ${dtiPct.toFixed(0)}% — thử giảm nợ hiện có, trả bớt một khoản nhỏ trước khi vay thêm, hoặc chứng minh thêm nguồn thu nhập phụ để kéo tỉ lệ này xuống dưới 40%.`);
+  if (cic !== null && factors.cic < 65) suggestions.push('Điểm CIC chưa cao — ưu tiên trả đúng hạn mọi khoản vay/thẻ tín dụng trong 3–6 tháng tới, giữ tỉ lệ dùng hạn mức thẻ dưới 30%, và tự tra cứu báo cáo CIC để phát hiện sai sót nếu có.');
+  if (factors.income < 65) suggestions.push(incomeType === 'fixed' ? 'Thu nhập theo thang phổ biến vẫn còn khiêm tốn so với khoản vay mong muốn — cân nhắc hồ sơ đồng vay/thế chấp để tăng khả năng duyệt.' : 'Thu nhập không cố định thường bị ngân hàng chiết khấu rủi ro — chuẩn bị sao kê 12–24 tháng thay vì 3 tháng để chứng minh tính ổn định.');
+  if (tenure !== null && factors.tenure < 65) suggestions.push('Thâm niên công việc/kinh doanh hiện tại còn ngắn — nhiều ngân hàng muốn tối thiểu 6–12 tháng ở nơi làm việc hiện tại; nếu mới chuyển việc, hồ sơ có thể mạnh hơn nếu gộp thêm thâm niên ngành nghề trước đó.');
+  if (collateral === 'none' && total < 65) suggestions.push('Đang xét theo hướng tín chấp — nếu có tài sản đảm bảo (sổ đỏ, ô tô...), hồ sơ thế chấp thường được duyệt dễ hơn và lãi suất thấp hơn đáng kể.');
+
+  resultWrap.innerHTML = `
+    <div class="score-result">
+      <div class="score-gauge">
+        ${gaugeSvg}
+        <div class="score-verdict-tag ${verdictClass}">${verdictText}</div>
+      </div>
+      <div class="score-factors">${factorRows}</div>
+    </div>
+    ${isBadDebt ? `<div class="score-flag callout alert"><strong>⚠️ Đang thuộc Nhóm nợ ${debtGroup} (nợ xấu).</strong> Ở nhóm này, hầu hết ngân hàng và công ty tài chính sẽ từ chối hồ sơ vay mới bất kể điểm tổng phía trên — thông tin nợ xấu thường lưu trên CIC tối thiểu vài năm sau khi tất toán. Ưu tiên trả dứt điểm khoản nợ quá hạn trước, sau đó chờ một thời gian (thường 1–5 năm tuỳ nhóm nợ) và giữ lịch sử sạch trước khi nộp hồ sơ mới.</div>` : ''}
+    ${suggestions.length ? `<div class="score-suggestions"><h4>Gợi ý cải thiện</h4><ul>${suggestions.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul></div>` : ''}
+    <div class="hint" style="margin-top:0.9rem;">Công cụ này ước lượng theo các ngưỡng phổ biến (DTI, thang điểm CIC 300–850, thâm niên công việc...) — không thay thế quy trình thẩm định thực tế, mỗi ngân hàng/công ty tài chính có mô hình chấm điểm và khẩu vị rủi ro riêng.</div>
+  `;
+}
+
+function initScoreTool() {
+  renderScoreWeightGrid();
+  const inputIds = ['sc_income', 'sc_income_type', 'sc_existing_debt', 'sc_new_payment', 'sc_cic', 'sc_debt_group', 'sc_tenure', 'sc_collateral'];
+  inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', computeAndRenderScore);
+    el.addEventListener('change', computeAndRenderScore);
+  });
+  document.getElementById('sc_pull_debt_btn').addEventListener('click', pullDebtFromApp);
+  computeAndRenderScore();
 }
 
 /* ============================================================
@@ -2592,6 +2850,8 @@ function init() {
 
   document.getElementById('f_late_type').addEventListener('change', updateLateFieldVisibility);
   document.getElementById('f_early_type').addEventListener('change', updateEarlyFieldVisibility);
+
+  initScoreTool();
 
   // Add a delete button dynamically inside the form actions when editing
   const formActions = document.querySelector('.form-actions');
