@@ -198,6 +198,30 @@
   }
   .burndown-row .pct { font-family: var(--mono); font-size: 0.8rem; text-align: right; }
 
+  /* Charts */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+  @media (max-width: 780px) { .chart-grid { grid-template-columns: 1fr; } }
+  .chart-svg { width: 100%; height: auto; display: block; }
+  .chart-center-label { font-family: var(--mono); font-size: 15px; font-weight: 700; fill: var(--ink); }
+  .chart-center-sub { font-family: var(--mono); font-size: 9px; fill: var(--ink-faint); }
+  .donut-row { display: flex; align-items: center; gap: 1.1rem; }
+  .donut-row .chart-svg { max-width: 150px; flex: 0 0 auto; }
+  .chart-legend { display: flex; flex-direction: column; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
+  .chart-legend-item { display: flex; align-items: baseline; gap: 0.45rem; font-size: 0.78rem; }
+  .chart-legend-item .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .chart-legend-item .lbl { color: var(--ink); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chart-legend-item .val { font-family: var(--mono); color: var(--ink-soft); flex: 0 0 auto; }
+  .chart-row-label { font-family: var(--sans); font-size: 11px; fill: var(--ink-soft); }
+  .chart-bar-value { font-family: var(--mono); font-size: 10px; fill: var(--ink); }
+  .chart-axis-label { font-family: var(--mono); font-size: 9px; fill: var(--ink-faint); }
+  .chart-grid-line { stroke: var(--line-soft); stroke-width: 1; }
+  .chart-marker-line { stroke: var(--alert); stroke-width: 1.5; stroke-dasharray: 3 3; }
+  .chart-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .chart-scroll .chart-svg { min-width: 100%; }
+  .chart-mini-legend { display: flex; gap: 1.1rem; margin-top: 0.5rem; flex-wrap: wrap; }
+  .chart-mini-legend .item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; color: var(--ink-soft); font-family: var(--mono); }
+  .chart-mini-legend .dot { width: 8px; height: 8px; border-radius: 2px; }
+
   /* Upcoming payments list */
   .pay-list { display: flex; flex-direction: column; }
   .pay-row {
@@ -423,6 +447,21 @@
           <div class="stat-row" id="statRow"></div>
 
           <div class="card">
+            <div class="chart-grid">
+              <div>
+                <h3>Cơ cấu dư nợ theo khoản vay</h3>
+                <div class="sub">Tỉ trọng dư nợ còn lại (theo các kỳ đã đánh dấu) của từng khoản vay trong tổng nợ.</div>
+                <div id="portfolioDonut"></div>
+              </div>
+              <div>
+                <h3>Gốc vay so với tổng lãi phải trả</h3>
+                <div class="sub">So sánh số tiền gốc với tổng lãi phải trả trong suốt kỳ hạn — khoản vay nào "đắt" hơn so với số tiền vay.</div>
+                <div id="costCompareBars"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
             <h3>Tiến độ trả nợ</h3>
             <div class="sub">Mỗi dòng là một khoản vay — vạch đen là vị trí "hôm nay" trên đường trả nợ.</div>
             <div id="burndownList"></div>
@@ -452,6 +491,7 @@
                 </select>
               </div>
             </div>
+            <div id="scheduleChartsWrap"></div>
             <div id="scheduleTableWrap"></div>
           </div>
         </div>
@@ -1343,6 +1383,176 @@ function escapeHtml(str) {
 }
 
 /* ============================================================
+   CHARTS ENGINE — SVG thuần, không phụ thuộc thư viện ngoài
+   (để chạy được offline / trên iOS Safari mà không cần tải CDN)
+   ============================================================ */
+const CHART_PALETTE = ['#0f6d5c', '#93691a', '#a8442c', '#3b6e91', '#6b5a8e', '#4f7942', '#b0803f', '#5c5346'];
+
+function chartColor(i) { return CHART_PALETTE[i % CHART_PALETTE.length]; }
+
+// ---- Donut chart: segments = [{label, value, color}] ----
+function buildDonutSVG(segments, opts = {}) {
+  const size = opts.size || 200;
+  const stroke = opts.stroke || 28;
+  const cx = size / 2, cy = size / 2;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const total = segments.reduce((s, d) => s + Math.max(0, d.value), 0);
+
+  if (total <= 0) {
+    return `<svg viewBox="0 0 ${size} ${size}" class="chart-svg">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--line)" stroke-width="${stroke}"/>
+      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" class="chart-center-label">—</text>
+    </svg>`;
+  }
+
+  let offset = 0;
+  const arcs = segments.filter(s => s.value > 0).map(seg => {
+    const frac = seg.value / total;
+    const dash = frac * circumference;
+    const gap = Math.max(0, circumference - dash);
+    const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${stroke}"
+      stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"
+      transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt">
+      <title>${escapeHtml(seg.label)}: ${escapeHtml(seg.valueLabel || String(Math.round(seg.value)))} (${(frac * 100).toFixed(1)}%)</title>
+    </circle>`;
+    offset += dash;
+    return el;
+  }).join('');
+
+  const centerMain = opts.centerLabel || '';
+  const centerSub = opts.centerSub || '';
+  return `<svg viewBox="0 0 ${size} ${size}" class="chart-svg">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--line-soft)" stroke-width="${stroke}"/>
+    ${arcs}
+    ${centerMain ? `<text x="${cx}" y="${cy - (centerSub ? 8 : 0)}" text-anchor="middle" dominant-baseline="middle" class="chart-center-label">${escapeHtml(centerMain)}</text>` : ''}
+    ${centerSub ? `<text x="${cx}" y="${cy + 16}" text-anchor="middle" dominant-baseline="middle" class="chart-center-sub">${escapeHtml(centerSub)}</text>` : ''}
+  </svg>`;
+}
+
+function buildLegend(segments) {
+  return `<div class="chart-legend">${segments.map(seg => `
+    <div class="chart-legend-item">
+      <span class="dot" style="background:${seg.color}"></span>
+      <span class="lbl">${escapeHtml(seg.label)}</span>
+      <span class="val">${escapeHtml(seg.valueLabel || String(Math.round(seg.value)))}</span>
+    </div>`).join('')}</div>`;
+}
+
+// ---- Horizontal grouped bars: rows = [{label, bars:[{value,color,valueLabel}]}] ----
+function buildGroupedBarsSVG(rows, opts = {}) {
+  const width = opts.width || 640;
+  const rowH = opts.rowH || 26;
+  const gap = opts.gap || 10;
+  const labelW = opts.labelW || 150;
+  const barAreaW = width - labelW - 60;
+  const maxVal = Math.max(1, ...rows.flatMap(r => r.bars.map(b => b.value)));
+  const barsPerRow = rows[0] ? rows[0].bars.length : 1;
+  const barH = (rowH - 4) / barsPerRow;
+  const height = rows.length * (rowH * barsPerRow + gap);
+
+  let y = 0;
+  const content = rows.map(row => {
+    const barsSvg = row.bars.map((b, i) => {
+      const w = Math.max(1, (b.value / maxVal) * barAreaW);
+      const by = y + i * barH;
+      const svg = `
+        <rect x="${labelW}" y="${by}" width="${w.toFixed(1)}" height="${(barH - 3).toFixed(1)}" rx="3" fill="${b.color}">
+          <title>${escapeHtml(row.label)} — ${escapeHtml(b.name || '')}: ${escapeHtml(b.valueLabel || String(Math.round(b.value)))}</title>
+        </rect>
+        <text x="${(labelW + w + 8).toFixed(1)}" y="${(by + barH / 2 - 1).toFixed(1)}" dominant-baseline="middle" class="chart-bar-value">${escapeHtml(b.valueLabel || '')}</text>`;
+      return svg;
+    }).join('');
+    const label = `<text x="0" y="${(y + (rowH * barsPerRow) / 2 - 1).toFixed(1)}" dominant-baseline="middle" class="chart-row-label">${escapeHtml(row.label)}</text>`;
+    const rowSvg = label + barsSvg;
+    y += rowH * barsPerRow + gap;
+    return rowSvg;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" class="chart-svg chart-bars">${content}</svg>`;
+}
+
+// ---- Stacked bars per period (gốc/lãi/trả thêm), with dimmed = chưa đánh dấu đã trả ----
+function buildPeriodStackedBarsSVG(periods, opts = {}) {
+  const width = opts.width || Math.max(560, periods.length * 34);
+  const height = opts.height || 220;
+  const padTop = 10, padBottom = 26, padLeft = 4, padRight = 4;
+  const plotH = height - padTop - padBottom;
+  const maxTotal = Math.max(1, ...periods.map(p => p.principal + p.interest + p.extra));
+  const n = periods.length;
+  const gap = 6;
+  const barW = Math.max(6, (width - padLeft - padRight) / n - gap);
+  const labelEvery = Math.ceil(n / 14) || 1;
+
+  let bars = '';
+  periods.forEach((p, i) => {
+    const x = padLeft + i * (barW + gap);
+    const opacity = p.paid ? 1 : 0.42;
+    let yCursor = padTop + plotH;
+    const segs = [
+      { v: p.principal, color: 'var(--accent)', name: 'Gốc' },
+      { v: p.interest, color: 'var(--gold)', name: 'Lãi' },
+      { v: p.extra, color: 'var(--alert)', name: 'Trả thêm' }
+    ];
+    let segSvg = '';
+    segs.forEach(seg => {
+      if (seg.v <= 0) return;
+      const h = (seg.v / maxTotal) * plotH;
+      yCursor -= h;
+      segSvg += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0.5, h).toFixed(1)}" fill="${seg.color}" opacity="${opacity}"><title>Kỳ ${p.period} — ${seg.name}: ${escapeHtml(p.valueLabel(seg.v))}${p.paid ? ' (đã trả)' : ''}</title></rect>`;
+    });
+    bars += segSvg;
+    if (i % labelEvery === 0 || i === n - 1) {
+      bars += `<text x="${(x + barW / 2).toFixed(1)}" y="${height - 8}" text-anchor="middle" class="chart-axis-label">${p.period}</text>`;
+    }
+  });
+
+  return `<svg viewBox="0 0 ${width} ${height}" class="chart-svg chart-period-bars" preserveAspectRatio="xMinYMin meet">${bars}</svg>`;
+}
+
+// ---- Declining balance area/line chart, with a marker at first unpaid period ----
+function buildBalanceAreaSVG(points, opts = {}) {
+  const width = opts.width || 640;
+  const height = opts.height || 200;
+  const padTop = 14, padBottom = 26, padLeft = 8, padRight = 8;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+  const n = points.length;
+  const maxY = Math.max(1, ...points.map(p => p.balance));
+  const stepX = n > 1 ? plotW / (n - 1) : 0;
+  const xAt = i => padLeft + i * stepX;
+  const yAt = v => padTop + plotH - (v / maxY) * plotH;
+
+  const linePts = points.map((p, i) => `${xAt(i).toFixed(1)},${yAt(p.balance).toFixed(1)}`).join(' ');
+  const areaPts = `${xAt(0).toFixed(1)},${(padTop + plotH).toFixed(1)} ${linePts} ${xAt(n - 1).toFixed(1)},${(padTop + plotH).toFixed(1)}`;
+
+  const markerIdx = points.findIndex(p => !p.paid);
+  const markerX = markerIdx >= 0 ? xAt(markerIdx) : null;
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const y = padTop + plotH * f;
+    return `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" class="chart-grid-line"/>`;
+  }).join('');
+
+  const labelEvery = Math.ceil(n / 10) || 1;
+  const xLabels = points.map((p, i) => {
+    if (i % labelEvery !== 0 && i !== n - 1) return '';
+    return `<text x="${xAt(i).toFixed(1)}" y="${height - 8}" text-anchor="middle" class="chart-axis-label">${p.period}</text>`;
+  }).join('');
+
+  const dots = points.map((p, i) => `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.balance).toFixed(1)}" r="2.4" fill="${p.paid ? 'var(--accent)' : 'var(--ink-faint)'}"><title>Kỳ ${p.period} — Dư nợ còn: ${escapeHtml(numberFmt.format(Math.round(p.balance)))}${p.paid ? ' (đã trả)' : ''}</title></circle>`).join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" class="chart-svg chart-balance-area" preserveAspectRatio="xMinYMin meet">
+    ${gridLines}
+    <polygon points="${areaPts}" fill="var(--accent-soft)" opacity="0.7"/>
+    <polyline points="${linePts}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${markerX !== null ? `<line x1="${markerX.toFixed(1)}" y1="${padTop}" x2="${markerX.toFixed(1)}" y2="${padTop + plotH}" class="chart-marker-line"/>` : ''}
+    ${dots}
+    ${xLabels}
+  </svg>`;
+}
+
+/* ============================================================
    COPY-FOR-AI: xuất thông tin khoản vay thành text để dán sang
    chatbot AI khác (không gọi API, chỉ build text + copy clipboard)
    ============================================================ */
@@ -1655,17 +1865,31 @@ function renderDashboard() {
   const today = new Date();
   let totalRemaining = 0, totalOriginal = 0, totalInterestPaidToDate = 0, dueThisMonth = 0;
   const thisMonthKey = monthKey(today);
+  const portfolioSegments = [];
+  const costRows = [];
 
   for (const loan of loans) {
     const sched = getLoanSchedule(loan);
     const { balance } = balanceAsOfToday(loan);
+    const paidPeriods = Array.isArray(loan.paidPeriods) ? loan.paidPeriods : [];
     totalRemaining += balance;
     totalOriginal += loan.principal;
     for (const p of sched.payments) {
-      if (p.date <= today) totalInterestPaidToDate += p.interest;
+      if (paidPeriods.includes(p.period)) totalInterestPaidToDate += p.interest;
       if (monthKey(p.date) === thisMonthKey) dueThisMonth += p.payment;
     }
+    if (balance > 0.5) {
+      portfolioSegments.push({ label: loan.name, value: balance, valueLabel: money(loan, balance) });
+    }
+    costRows.push({
+      label: loan.name,
+      bars: [
+        { value: loan.principal, color: 'var(--accent)', name: 'Gốc', valueLabel: money(loan, loan.principal) },
+        { value: sched.totalInterest, color: 'var(--gold)', name: 'Tổng lãi', valueLabel: money(loan, sched.totalInterest) }
+      ]
+    });
   }
+  portfolioSegments.forEach((s, i) => { s.color = chartColor(i); });
 
   document.getElementById('statRow').innerHTML = `
     <div class="stat">
@@ -1689,6 +1913,26 @@ function renderDashboard() {
       <div class="sub">${monthLabelVN(thisMonthKey)}</div>
     </div>
   `;
+
+  // Portfolio composition donut (remaining balance by loan)
+  const donutEl = document.getElementById('portfolioDonut');
+  if (portfolioSegments.length === 0) {
+    donutEl.innerHTML = `<div class="empty-note" style="padding:1rem 0;">🎉 Không còn dư nợ nào.</div>`;
+  } else {
+    donutEl.innerHTML = `
+      <div class="donut-row">
+        ${buildDonutSVG(portfolioSegments, { size: 150, stroke: 22, centerLabel: numberFmt.format(Math.round(totalRemaining)), centerSub: 'còn lại' })}
+        ${buildLegend(portfolioSegments)}
+      </div>`;
+  }
+
+  // Cost comparison bars (principal vs total interest per loan)
+  document.getElementById('costCompareBars').innerHTML = `
+    <div class="chart-scroll">${buildGroupedBarsSVG(costRows, { width: 520, rowH: 22, gap: 12, labelW: 130 })}</div>
+    <div class="chart-mini-legend">
+      <div class="item"><span class="dot" style="background:var(--accent)"></span>Gốc vay</div>
+      <div class="item"><span class="dot" style="background:var(--gold)"></span>Tổng lãi cả kỳ hạn</div>
+    </div>`;
 
   // Burndown rows
   const typeLabel = { amortizing: 'Trả đều', declining: 'Gốc đều', interest_only: 'Lãi trước' };
@@ -1758,9 +2002,11 @@ function renderScheduleTab() {
 
 function renderScheduleTable(selection) {
   const wrap = document.getElementById('scheduleTableWrap');
+  const chartsWrap = document.getElementById('scheduleChartsWrap');
   const today = new Date();
 
   if (selection === '__all__') {
+    chartsWrap.innerHTML = '';
     const consolidated = getMonthlyConsolidated();
     let rows = '';
     for (const m of consolidated) {
@@ -1801,6 +2047,34 @@ function renderScheduleTable(selection) {
     const remainingBalance = lastPaidRow ? lastPaidRow.balance : loan.principal;
     const nextUnpaid = sched.payments.find(p => !loan.paidPeriods.includes(p.period));
 
+    const periodData = sched.payments.map(p => ({
+      period: p.period, principal: p.principal, interest: p.interest, extra: p.extra,
+      paid: loan.paidPeriods.includes(p.period),
+      valueLabel: (v) => money(loan, v)
+    }));
+    const balancePoints = sched.payments.map(p => ({ period: p.period, balance: p.balance, paid: loan.paidPeriods.includes(p.period) }));
+
+    chartsWrap.innerHTML = `
+      <div class="card" style="margin-bottom:0.9rem;">
+        <div class="chart-grid">
+          <div>
+            <h3>Gốc &amp; lãi mỗi kỳ</h3>
+            <div class="sub">Mỗi cột là một kỳ trả nợ — phần mờ là kỳ chưa đánh dấu đã trả.</div>
+            <div class="chart-scroll">${buildPeriodStackedBarsSVG(periodData)}</div>
+            <div class="chart-mini-legend">
+              <div class="item"><span class="dot" style="background:var(--accent)"></span>Gốc</div>
+              <div class="item"><span class="dot" style="background:var(--gold)"></span>Lãi</div>
+              ${sched.totalExtra > 0 ? '<div class="item"><span class="dot" style="background:var(--alert)"></span>Trả thêm</div>' : ''}
+            </div>
+          </div>
+          <div>
+            <h3>Dư nợ giảm dần</h3>
+            <div class="sub">Đường nét đứt đỏ đánh dấu kỳ tiếp theo cần trả.</div>
+            <div class="chart-scroll">${buildBalanceAreaSVG(balancePoints)}</div>
+          </div>
+        </div>
+      </div>`;
+
     const rows = sched.payments.map(p => {
       const isMarkedPaid = loan.paidPeriods.includes(p.period);
       const isPastDue = p.date <= today;
@@ -1829,7 +2103,7 @@ function renderScheduleTable(selection) {
         ${nextUnpaid ? `<div><div style="font-size:0.72rem; color:var(--ink-soft);">Kỳ tiếp theo cần trả</div><span class="big" style="font-size:1.3rem;">Kỳ ${nextUnpaid.period} — ${formatDateVN(nextUnpaid.date)}</span></div>` : `<div style="color:var(--accent); font-weight:600;">🎉 Đã trả hết!</div>`}
       </div>
       <div class="hint" style="margin-bottom:0.6rem;">Bấm "Đánh dấu" ở mỗi kỳ để ghi lại là bạn đã trả kỳ đó. Dư nợ còn lại phía trên lấy theo kỳ đã đánh dấu ở số thứ tự cao nhất (giả định các kỳ được trả tuần tự). Nếu muốn tính chính xác lãi dồn tích / tất toán sớm theo ngày trả thực tế, dùng thêm mục "Lịch sử trả thực tế" ở tab Tất toán sớm.</div>
-      <div class="table-scroll">
+      <div class="table-scroll" style="margin-bottom:0;">
         <table class="ledger">
           <thead><tr>
             <th>Kỳ</th><th>Ngày</th><th>Thanh toán</th><th>Gốc</th><th>Trả thêm</th><th>Lãi</th><th>Dư nợ còn</th><th>Trạng thái</th>
