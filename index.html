@@ -487,6 +487,7 @@
         <button class="tab-btn" data-tab="schedule">Lịch trả nợ</button>
         <button class="tab-btn" data-tab="payoff">Tất toán sớm</button>
         <button class="tab-btn" data-tab="extra">Trả thêm</button>
+        <button class="tab-btn" data-tab="refi">🔁 Tái cấp vốn</button>
         <button class="tab-btn" data-tab="decode">Giải mã HĐ &amp; Kịch bản</button>
         <button class="tab-btn" data-tab="tips">💡 Tips vay thông minh</button>
       </nav>
@@ -650,6 +651,60 @@
               <button class="btn accent" id="extra_apply_btn">Xem kết quả</button>
             </div>
             <div id="extraResult" style="margin-top: 1rem;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- REFINANCE CALCULATOR ---------- -->
+      <section id="tab-refi" class="hidden">
+        <div id="refiEmpty" class="card empty-state hidden">
+          <div class="glyph">🔁</div>
+          <div>Thêm khoản vay để tính toán tái cấp vốn.</div>
+        </div>
+        <div id="refiContent" class="hidden">
+          <div class="card">
+            <h3>So sánh: giữ nguyên khoản vay cũ vs. tái cấp vốn</h3>
+            <div class="sub">Nhập điều khoản khoản vay mới dự kiến — hệ thống dùng lại đúng công thức tính tất toán sớm (bao gồm phí phạt nếu có) để biết chính xác cần vay bao nhiêu, rồi dựng lịch trả cho khoản vay mới để so sánh tổng chi phí và tính điểm hoà vốn.</div>
+
+            <div class="eyebrow section-divider">Khoản vay hiện tại</div>
+            <div class="row-controls">
+              <div class="field">
+                <label>Khoản vay</label>
+                <select id="refi_loan"></select>
+              </div>
+              <div class="field">
+                <label>Ngày dự định tái cấp vốn</label>
+                <input type="date" id="refi_date">
+              </div>
+            </div>
+
+            <div class="eyebrow section-divider">Khoản vay mới đề xuất</div>
+            <div class="form-grid">
+              <div class="field">
+                <label>Lãi suất mới (%/năm)</label>
+                <input type="number" id="refi_rate" placeholder="8.5" step="0.01">
+              </div>
+              <div class="field">
+                <label>Kỳ hạn mới (tháng)</label>
+                <input type="number" id="refi_term" placeholder="60" step="1">
+              </div>
+              <div class="field">
+                <label>Phí làm hồ sơ / thẩm định / công chứng...</label>
+                <input type="number" id="refi_fees" placeholder="3000000" step="100000">
+              </div>
+              <div class="field" style="display:flex; align-items:flex-end; padding-bottom: 0.4rem;">
+                <label style="display:flex; align-items:center; gap:0.45rem; font-weight:400; cursor:pointer;">
+                  <input type="checkbox" id="refi_finance_fees" style="width:auto;">
+                  Cộng dồn phí vào gốc vay mới (thay vì trả tiền mặt ngay)
+                </label>
+              </div>
+            </div>
+
+            <div class="form-actions" style="max-width: 420px;">
+              <button class="btn accent" id="refi_calc_btn">Tính toán tái cấp vốn</button>
+            </div>
+
+            <div id="refiResult" style="margin-top: 1.1rem;"></div>
           </div>
         </div>
       </section>
@@ -1395,6 +1450,70 @@ function calculatePayoffWithFee(loan, asOfStr) {
 
   fee = Math.round(fee);
   return { ...base, earlyPayoffFee: fee, feeDescription, totalPayoff: base.payoffAmount + fee };
+}
+
+/* ============================================================
+   REFINANCE CALCULATOR
+   ------------------------------------------------------------
+   Sub-flow độc lập, tái dùng lại 3 khối tính toán đã có sẵn thay vì
+   viết lại: calculatePayoffWithFee() để biết chính xác phải trả bao
+   nhiêu để đóng khoản vay cũ (gồm cả phí tất toán sớm), rồi
+   generateSchedule() + computeFixedPayment() để dựng lịch trả của
+   khoản vay mới — cùng convention lãi/ngày với phần còn lại của app.
+
+   refi = {
+     newRatePct, newTermMonths,        // điều khoản khoản vay mới
+     newFees = 0,                      // phí làm hồ sơ / thẩm định / công chứng... của khoản vay mới
+     financeFees = false,              // true = cộng dồn phí vào gốc vay mới thay vì trả tiền mặt ngay
+     repaymentType                     // tuỳ chọn, mặc định giữ nguyên kiểu trả nợ của khoản vay cũ
+   }
+   ============================================================ */
+function calculateRefinance(loan, asOfStr, refi) {
+  const { newRatePct, newTermMonths, newFees = 0, financeFees = false, repaymentType } = refi;
+
+  // Bước 1: chi phí chính xác để đóng khoản vay cũ hôm nay — TÁI DÙNG hàm đã có
+  const payoff = calculatePayoffWithFee(loan, asOfStr);
+
+  // Bước 2: dựng khoản vay mới, gốc = số tiền cần để đóng khoản cũ (+ phí nếu cộng dồn)
+  const newPrincipal = financeFees ? payoff.totalPayoff + newFees : payoff.totalPayoff;
+  const newLoan = {
+    principal: newPrincipal,
+    ratePct: newRatePct,
+    termMonths: newTermMonths,
+    startDate: asOfStr,
+    repaymentType: repaymentType || loan.repaymentType
+  };
+  const newSchedule = generateSchedule(newLoan, null); // TÁI DÙNG engine lịch trả nợ chính
+
+  // Bước 3: khoản trả mỗi kỳ hiện tại (kỳ kế tiếp theo lịch CŨ) để so với khoản trả mới
+  const oldSchedule = getLoanSchedule(loan);
+  const asOf = parseDateOnly(asOfStr);
+  const nextOldPayment = oldSchedule.payments.find(p => p.date >= asOf)
+    || oldSchedule.payments[oldSchedule.payments.length - 1];
+  const oldMonthlyPayment = nextOldPayment ? nextOldPayment.payment : 0;
+
+  const newMonthlyPayment = newLoan.repaymentType === 'amortizing'
+    ? computeFixedPayment(newPrincipal, (newRatePct / 100) / 12, newTermMonths)
+    : (newSchedule.payments[0] ? newSchedule.payments[0].payment : 0);
+
+  // Bước 4: so sánh tổng chi phí "giữ nguyên khoản vay cũ tới hết kỳ hạn" vs "tái cấp vốn"
+  // payoff.interestSavedVsFullTerm = tổng lãi CÒN LẠI theo lịch gốc từ giờ tới hết kỳ hạn cũ
+  const totalCostStay = payoff.remainingBalance + payoff.interestSavedVsFullTerm;
+  const totalCostRefinance = newSchedule.totalPaid + (financeFees ? 0 : newFees);
+  const netSavings = totalCostStay - totalCostRefinance;
+
+  // Bước 5: điểm hoà vốn — mất bao nhiêu tháng để khoản tiết kiệm hàng tháng bù lại chi phí bỏ ra trước
+  const upfrontCost = payoff.earlyPayoffFee + (financeFees ? 0 : newFees);
+  const monthlySavings = oldMonthlyPayment - newMonthlyPayment;
+  const breakEvenMonths = monthlySavings > 0.01 ? upfrontCost / monthlySavings : null;
+
+  return {
+    payoff, newSchedule, newLoan, newPrincipal,
+    oldMonthlyPayment, newMonthlyPayment, monthlySavings,
+    totalCostStay, totalCostRefinance, netSavings,
+    upfrontCost, breakEvenMonths,
+    worthIt: netSavings > 0 && (breakEvenMonths === null || breakEvenMonths <= newTermMonths)
+  };
 }
 
 /* ============================================================
@@ -2385,12 +2504,13 @@ function deleteActiveLoan() {
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['dashboard', 'schedule', 'payoff', 'extra', 'decode', 'tips'].forEach(t => {
+  ['dashboard', 'schedule', 'payoff', 'extra', 'refi', 'decode', 'tips'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
   });
   if (tab === 'schedule') renderScheduleTab();
   if (tab === 'payoff') renderPayoffTab();
   if (tab === 'extra') renderExtraTab();
+  if (tab === 'refi') renderRefiTab();
   if (tab === 'decode') renderDecodeTab();
 }
 
@@ -2803,8 +2923,95 @@ function renderPayoffTab() {
 }
 
 /* ============================================================
-   RENDER: EXTRA PAYMENT SIMULATOR TAB
+   RENDER: REFINANCE CALCULATOR TAB
    ============================================================ */
+function renderRefiTab() {
+  const hasLoans = loans.length > 0;
+  document.getElementById('refiEmpty').classList.toggle('hidden', hasLoans);
+  document.getElementById('refiContent').classList.toggle('hidden', !hasLoans);
+  if (!hasLoans) return;
+
+  const select = document.getElementById('refi_loan');
+  populateLoanSelect(select, false);
+  const dateInput = document.getElementById('refi_date');
+  if (!dateInput.value) dateInput.value = toDateInputValue(new Date());
+
+  // Gợi ý sẵn kỳ hạn mới = kỳ hạn còn lại của khoản vay đang chọn, cho dễ bắt đầu
+  const prefillTerm = () => {
+    const loan = loans.find(l => l.id === select.value);
+    if (!loan) return;
+    const sched = getLoanSchedule(loan);
+    const paidPeriods = Array.isArray(loan.paidPeriods) ? loan.paidPeriods : [];
+    const remainingPeriods = sched.payments.filter(p => !paidPeriods.includes(p.period)).length || loan.termMonths;
+    if (!document.getElementById('refi_term').value) document.getElementById('refi_term').value = remainingPeriods;
+  };
+  select.onchange = prefillTerm;
+  prefillTerm();
+
+  document.getElementById('refi_calc_btn').onclick = () => {
+    const loan = loans.find(l => l.id === select.value);
+    if (!loan) { alert('Chọn khoản vay.'); return; }
+
+    const newRatePct = parseFloat(document.getElementById('refi_rate').value);
+    const newTermMonths = parseInt(document.getElementById('refi_term').value, 10);
+    const newFees = parseFloat(document.getElementById('refi_fees').value) || 0;
+    const financeFees = document.getElementById('refi_finance_fees').checked;
+
+    if (isNaN(newRatePct) || newRatePct < 0) { alert('Nhập lãi suất mới hợp lệ.'); return; }
+    if (isNaN(newTermMonths) || newTermMonths <= 0) { alert('Nhập kỳ hạn mới hợp lệ.'); return; }
+    if (!dateInput.value) { alert('Chọn ngày dự định tái cấp vốn.'); return; }
+
+    const r = calculateRefinance(loan, dateInput.value, { newRatePct, newTermMonths, newFees, financeFees });
+    const cur = loan.currency || '₫';
+    const fmt = (v) => numberFmt.format(Math.round(v)) + ' ' + cur;
+    const hasEarlyFee = loan.earlyPayoffFeeConfig && loan.earlyPayoffFeeConfig.enabled;
+
+    const verdictClass = r.netSavings > 0 ? 'accent' : 'alert';
+    const verdictText = r.netSavings > 0
+      ? `Tái cấp vốn tiết kiệm được ${fmt(r.netSavings)} so với giữ nguyên khoản vay cũ.`
+      : `Tái cấp vốn TỐN THÊM ${fmt(-r.netSavings)} so với giữ nguyên khoản vay cũ — cân nhắc kỹ.`;
+
+    document.getElementById('refiResult').innerHTML = `
+      <div class="callout ${verdictClass}" style="margin-top: 0.9rem;">
+        <div style="font-size:0.8rem; color: var(--ink-soft);">Kết luận</div>
+        <span class="big" style="font-size:1.15rem; line-height:1.4;">${verdictText}</span>
+      </div>
+
+      <div class="table-scroll" style="margin-top:1rem;">
+        <table class="ledger">
+          <thead><tr><th style="text-align:left;">So sánh</th><th>Giữ nguyên khoản vay cũ</th><th>Tái cấp vốn</th></tr></thead>
+          <tbody>
+            <tr><td style="text-align:left;">Khoản trả mỗi kỳ hiện tại</td><td>${fmt(r.oldMonthlyPayment)}</td><td>${fmt(r.newMonthlyPayment)}</td></tr>
+            <tr><td style="text-align:left;">Tổng phải trả từ nay đến hết kỳ hạn</td><td>${fmt(r.totalCostStay)}</td><td>${fmt(r.totalCostRefinance)}</td></tr>
+            <tr><td style="text-align:left;">Kỳ hạn còn lại</td><td>${loan.termMonths} kỳ (gốc)</td><td>${r.newLoan.termMonths} kỳ (mới)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="kv-grid" style="margin-top: 1rem;">
+        <div class="k">Số tiền cần vay mới (đóng khoản cũ${r.payoff.earlyPayoffFee > 0 ? ' + phí tất toán sớm' : ''}${financeFees && newFees > 0 ? ' + phí hồ sơ' : ''})</div>
+        <div class="v">${fmt(r.newPrincipal)}</div>
+        <div class="k">Dư nợ gốc còn lại của khoản vay cũ (đến ${formatDateVN(r.payoff.lastPaymentDate)})</div>
+        <div class="v">${fmt(r.payoff.remainingBalance)}</div>
+        <div class="k">Lãi dồn tích khoản vay cũ (${r.payoff.daysAccrued} ngày)</div>
+        <div class="v">${fmt(r.payoff.accruedInterest)}</div>
+        ${hasEarlyFee ? `<div class="k">Phí tất toán sớm khoản vay cũ (${r.payoff.feeDescription})</div><div class="v" style="color:var(--alert);">${fmt(r.payoff.earlyPayoffFee)}</div>` : ''}
+        <div class="k">Phí làm hồ sơ khoản vay mới${financeFees ? ' (đã cộng vào gốc vay mới)' : ' (trả tiền mặt ngay)'}</div>
+        <div class="v" style="color: ${newFees > 0 ? 'var(--alert)' : 'inherit'};">${newFees > 0 ? fmt(newFees) : '—'}</div>
+        <div class="k">Chi phí bỏ ra ngay (upfront) để tái cấp vốn</div>
+        <div class="v" style="color:var(--alert);">${fmt(r.upfrontCost)}</div>
+        <div class="k">Điểm hoà vốn (số tháng để khoản tiết kiệm mỗi kỳ bù lại chi phí bỏ ra)</div>
+        <div class="v">${r.breakEvenMonths === null ? 'Không hoà vốn được (khoản trả mới không thấp hơn)' : Math.ceil(r.breakEvenMonths) + ' tháng'}</div>
+      </div>
+
+      <div class="hint" style="margin-top:0.8rem;">
+        "Giữ nguyên khoản vay cũ" = tổng số tiền còn phải trả nếu tiếp tục đúng lịch gốc đến hết kỳ hạn hiện tại (dùng cùng công thức lãi dồn tích như tab "Tất toán sớm"). "Tái cấp vốn" = đóng khoản vay cũ hôm nay (gồm phí phạt nếu có) rồi vay khoản mới theo điều khoản bạn nhập ở trên. Điểm hoà vốn chỉ có ý nghĩa khi khoản trả mỗi kỳ giảm; nếu kỳ hạn mới ngắn hơn nhiều, khoản trả mỗi kỳ có thể KHÔNG giảm dù lãi suất thấp hơn — khi đó "hoà vốn" nhìn theo tổng chi phí (dòng "Kết luận" ở trên) đáng tin hơn.
+      </div>
+    `;
+  };
+}
+
+
 function renderExtraTab() {
   const hasLoans = loans.length > 0;
   document.getElementById('extraEmpty').classList.toggle('hidden', hasLoans);
@@ -3229,6 +3436,7 @@ function renderAll() {
   if (activeTab === 'schedule') renderScheduleTab();
   if (activeTab === 'payoff') renderPayoffTab();
   if (activeTab === 'extra') renderExtraTab();
+  if (activeTab === 'refi') renderRefiTab();
   if (activeTab === 'decode') renderDecodeTab();
 }
 
