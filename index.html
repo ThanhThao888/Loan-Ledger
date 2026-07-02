@@ -694,6 +694,76 @@
 
             <div id="scenarioResult" style="margin-top: 1.3rem;"></div>
             <div id="sensitivitySection" style="margin-top: 1.3rem;"></div>
+
+            <div class="eyebrow section-divider">⑤ Ma trận tổ hợp biến số (Channel Matrix)</div>
+            <div class="hint" style="margin-top: -0.3rem; margin-bottom: 0.6rem;">Chọn 2 biến số khác nhau, mỗi biến một dải giá trị (min / max / bước nhảy) → bảng ma trận cho thấy kết quả ở MỌI tổ hợp cùng lúc, thay vì so từng cặp kịch bản. Ô càng xanh = chi phí/thời gian càng thấp (tốt hơn), càng đỏ = càng cao.</div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label>Biến trục hàng</label>
+                <select id="mtx_row_var">
+                  <option value="rate">Lãi suất (%/năm)</option>
+                  <option value="term">Kỳ hạn (tháng)</option>
+                  <option value="extra">Trả thêm / kỳ</option>
+                  <option value="latedays">Trễ hạn (ngày, mọi kỳ)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Min</label>
+                <input type="number" id="mtx_row_min" placeholder="8">
+              </div>
+              <div class="field">
+                <label>Max</label>
+                <input type="number" id="mtx_row_max" placeholder="14">
+              </div>
+              <div class="field">
+                <label>Bước nhảy</label>
+                <input type="number" id="mtx_row_step" placeholder="1" min="0.01">
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label>Biến trục cột</label>
+                <select id="mtx_col_var">
+                  <option value="term">Kỳ hạn (tháng)</option>
+                  <option value="rate">Lãi suất (%/năm)</option>
+                  <option value="extra">Trả thêm / kỳ</option>
+                  <option value="latedays">Trễ hạn (ngày, mọi kỳ)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Min</label>
+                <input type="number" id="mtx_col_min" placeholder="12">
+              </div>
+              <div class="field">
+                <label>Max</label>
+                <input type="number" id="mtx_col_max" placeholder="36">
+              </div>
+              <div class="field">
+                <label>Bước nhảy</label>
+                <input type="number" id="mtx_col_step" placeholder="6" min="0.01">
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label>Kết quả hiển thị trong ma trận</label>
+                <select id="mtx_metric">
+                  <option value="grandTotal">Tổng chi phí (gốc+lãi+phí phạt)</option>
+                  <option value="totalInterest">Tổng lãi</option>
+                  <option value="payment">Khoản trả mỗi kỳ (ước tính)</option>
+                  <option value="payoffPeriod">Kỳ hạn thực tế (số kỳ)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-actions" style="max-width: 460px;">
+              <button class="btn ghost" id="mtx_clear">Xoá ma trận</button>
+              <button class="btn accent" id="mtx_run">Tạo ma trận</button>
+            </div>
+
+            <div id="mtxResult" style="margin-top: 1.1rem;"></div>
           </div>
         </div>
       </section>
@@ -1386,6 +1456,79 @@ function sensitivityLatePayments(loan, daysLateOptions) {
   });
 }
 
+
+/* ============================================================
+   CHANNEL MATRIX: quét đồng thời 2 biến số x/y → bảng kết quả
+   mọi tổ hợp (thay vì so từng cặp kịch bản)
+   ============================================================ */
+const MATRIX_VAR_KEY = { rate: 'ratePct', term: 'termMonths', extra: 'extraAmount', latedays: 'lateDays' };
+const MATRIX_VAR_LABEL = { rate: 'Lãi suất', term: 'Kỳ hạn', extra: 'Trả thêm/kỳ', latedays: 'Trễ hạn' };
+
+function formatMatrixAxisValue(varKey, v) {
+  switch (varKey) {
+    case 'rate': return v + '%';
+    case 'term': return v + ' kỳ';
+    case 'extra': return v === 0 ? 'Không' : '+' + numberFmt.format(v);
+    case 'latedays': return v === 0 ? 'Đúng hạn' : v + ' ngày';
+    default: return String(v);
+  }
+}
+
+function buildMatrixAxisValues(min, max, step) {
+  const vals = [];
+  if (isNaN(min) || isNaN(max) || isNaN(step) || step <= 0 || max < min) return vals;
+  const MAX_STEPS = 15;
+  let v = min;
+  let guard = 0;
+  while (v <= max + 1e-9 && guard < MAX_STEPS) {
+    vals.push(Math.round(v * 1000) / 1000);
+    v += step;
+    guard++;
+  }
+  return vals;
+}
+
+function computeMatrixCell(loan, overrides) {
+  const clone = { ...loan, ratePct: overrides.ratePct, termMonths: overrides.termMonths };
+  const extraConfig = overrides.extraAmount > 0 ? { mode: 'recurring', fromPeriod: 1, amount: overrides.extraAmount } : null;
+  const sched = generateSchedule(clone, extraConfig);
+
+  let totalPenalty = 0;
+  if (overrides.lateDays > 0 && loan.lateFeeConfig && loan.lateFeeConfig.enabled) {
+    for (const p of sched.payments) {
+      const { penalty } = calculateLatePenalty(p.payment, overrides.lateDays, loan.lateFeeConfig, clone.ratePct);
+      totalPenalty += penalty;
+    }
+  }
+
+  const payment = clone.repaymentType === 'amortizing'
+    ? computeFixedPayment(clone.principal, (clone.ratePct / 100) / 12, clone.termMonths)
+    : (sched.payments[0] ? sched.payments[0].payment : 0);
+
+  return {
+    totalInterest: sched.totalInterest,
+    totalPaid: sched.totalPaid,
+    totalPenalty,
+    grandTotal: sched.totalPaid + totalPenalty,
+    payoffPeriod: sched.payoffPeriod,
+    payment
+  };
+}
+
+function generateChannelMatrix(loan, rowVar, rowValues, colVar, colValues, metric) {
+  const defaults = { ratePct: loan.ratePct, termMonths: loan.termMonths, extraAmount: 0, lateDays: 0 };
+  const rowKey = MATRIX_VAR_KEY[rowVar];
+  const colKey = MATRIX_VAR_KEY[colVar];
+
+  return rowValues.map(rv => colValues.map(cv => {
+    const overrides = { ...defaults };
+    overrides[rowKey] = rv;
+    overrides[colKey] = cv;
+    if (overrides.termMonths <= 0 || overrides.ratePct < 0) return null;
+    const cell = computeMatrixCell(loan, overrides);
+    return cell[metric];
+  }));
+}
 
 /* ============================================================
    PORTFOLIO-LEVEL AGGREGATION
@@ -2580,6 +2723,10 @@ function renderDecodeTab() {
     document.getElementById('scenarioResult').innerHTML = '';
     document.getElementById('sensitivitySection').innerHTML = '';
   };
+  document.getElementById('mtx_run').onclick = runChannelMatrix;
+  document.getElementById('mtx_clear').onclick = () => {
+    document.getElementById('mtxResult').innerHTML = '';
+  };
 }
 
 function renderDecodeResult(r) {
@@ -2758,6 +2905,84 @@ function runScenarioComparison() {
   `;
 
   renderSensitivitySection(loan);
+}
+
+function heatColorForMatrix(value, min, max) {
+  if (value === null || value === undefined || isNaN(value)) return 'transparent';
+  if (max === min) return 'transparent';
+  const t = (value - min) / (max - min); // 0 = tốt nhất, 1 = tệ nhất
+  const hue = 140 - t * 140; // 140 xanh lá -> 0 đỏ
+  return `hsl(${hue}, 62%, ${88 - t * 16}%)`;
+}
+
+function runChannelMatrix() {
+  const loan = loans.find(l => l.id === document.getElementById('scn_loan').value);
+  if (!loan) { alert('Chọn khoản vay ở trên trước.'); return; }
+
+  const rowVar = document.getElementById('mtx_row_var').value;
+  const colVar = document.getElementById('mtx_col_var').value;
+  if (rowVar === colVar) { alert('Trục hàng và trục cột phải là 2 biến số khác nhau.'); return; }
+
+  const rowMin = parseFloat(document.getElementById('mtx_row_min').value);
+  const rowMax = parseFloat(document.getElementById('mtx_row_max').value);
+  const rowStep = parseFloat(document.getElementById('mtx_row_step').value);
+  const colMin = parseFloat(document.getElementById('mtx_col_min').value);
+  const colMax = parseFloat(document.getElementById('mtx_col_max').value);
+  const colStep = parseFloat(document.getElementById('mtx_col_step').value);
+  const metric = document.getElementById('mtx_metric').value;
+
+  const rowValues = buildMatrixAxisValues(rowMin, rowMax, rowStep);
+  const colValues = buildMatrixAxisValues(colMin, colMax, colStep);
+  if (rowValues.length === 0 || colValues.length === 0) {
+    alert('Nhập đủ Min / Max / Bước nhảy hợp lệ cho cả 2 trục (Max ≥ Min, bước nhảy > 0).');
+    return;
+  }
+
+  if ((rowVar === 'latedays' || colVar === 'latedays') && (!loan.lateFeeConfig || !loan.lateFeeConfig.enabled)) {
+    alert('Khoản vay này chưa cấu hình phí trả chậm — trục "Trễ hạn" sẽ không tạo ra chênh lệch nào (phí phạt luôn = 0). Vào form sửa khoản vay để cấu hình nếu hợp đồng có quy định.');
+  }
+
+  const grid = generateChannelMatrix(loan, rowVar, rowValues, colVar, colValues, metric);
+  const flat = grid.flat().filter(v => v !== null && v !== undefined && !isNaN(v));
+  const min = Math.min(...flat);
+  const max = Math.max(...flat);
+  const cur = loan.currency || '₫';
+
+  const isMoney = metric === 'totalInterest' || metric === 'grandTotal' || metric === 'payment';
+  const fmtCell = (v) => {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    if (metric === 'payoffPeriod') return Math.round(v) + ' kỳ';
+    return numberFmt.format(Math.round(v));
+  };
+
+  const metricLabelMap = {
+    grandTotal: 'Tổng chi phí', totalInterest: 'Tổng lãi',
+    payment: 'Khoản trả mỗi kỳ', payoffPeriod: 'Kỳ hạn thực tế'
+  };
+
+  const headCells = colValues.map(cv => `<th>${formatMatrixAxisValue(colVar, cv)}</th>`).join('');
+  const bodyRows = rowValues.map((rv, ri) => {
+    const cells = colValues.map((cv, ci) => {
+      const v = grid[ri][ci];
+      const bg = heatColorForMatrix(v, min, max);
+      return `<td style="background:${bg}; font-weight:600;">${fmtCell(v)}</td>`;
+    }).join('');
+    return `<tr><td style="text-align:left; font-weight:700; background:var(--panel,#f4f4f4);">${formatMatrixAxisValue(rowVar, rv)}</td>${cells}</tr>`;
+  }).join('');
+
+  document.getElementById('mtxResult').innerHTML = `
+    <div class="hint" style="margin-bottom:0.5rem;">
+      Ma trận <strong>${metricLabelMap[metric]}</strong>${isMoney ? ' (' + cur + ')' : ''} —
+      hàng: <strong>${MATRIX_VAR_LABEL[rowVar]}</strong>, cột: <strong>${MATRIX_VAR_LABEL[colVar]}</strong>.
+      Xanh = tốt hơn (thấp hơn), đỏ = kém hơn (cao hơn), trong phạm vi ${rowValues.length}×${colValues.length} tổ hợp đã chọn.
+    </div>
+    <div class="table-scroll">
+      <table class="ledger">
+        <thead><tr><th style="text-align:left;">${MATRIX_VAR_LABEL[rowVar]} \\ ${MATRIX_VAR_LABEL[colVar]}</th>${headCells}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderSensitivitySection(loan) {
