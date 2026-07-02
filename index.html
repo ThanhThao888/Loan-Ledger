@@ -903,8 +903,9 @@
               <input type="number" id="sc_new_payment" placeholder="0" step="100000" min="0">
             </div>
             <div class="field">
-              <label>Điểm CIC (thang phổ biến 300–850)</label>
-              <input type="number" id="sc_cic" placeholder="650" step="1" min="300" max="850">
+              <label>Điểm CIC (thang chính thức CIC Việt Nam, 403–706)</label>
+              <input type="number" id="sc_cic" placeholder="587" step="1" min="403" max="706">
+              <div id="cicRankBadge"></div>
             </div>
             <div class="field">
               <label>Nhóm nợ hiện tại (nếu biết)</label>
@@ -1384,6 +1385,118 @@ function decodeContract(principal, monthlyPayment, termMonths, currency) {
     hitCeiling,
     schedule,
     yearlyBreakdown: Object.values(yearly)
+  };
+}
+
+/* ============================================================
+   CHI PHÍ VỐN THỰC (TRUE COST OF CAPITAL / ALL-IN APR)
+   ------------------------------------------------------------
+   Ý tưởng: ngân hàng có thể "giấu" chi phí thực vào phí một lần
+   (thẩm định, giải ngân, công chứng...) hoặc bảo hiểm khoản vay bắt
+   buộc thay vì thể hiện trong lãi suất niêm yết. Để so sánh "táo với
+   táo" giữa các đề nghị vay, ta cần:
+     1) Số tiền THỰC NHẬN (net advance) = gốc vay − các phí trả ngay
+        bằng tiền mặt lúc giải ngân (nếu phí được cộng dồn vào gốc
+        vay thay vì trả tiền mặt, thì net advance = đúng số tiền
+        muốn vay, nhưng khoản nợ phải trả lại tăng lên tương ứng).
+     2) Toàn bộ DÒNG TIỀN THỰC PHẢI TRẢ mỗi kỳ theo hợp đồng (dùng
+        lại generateSchedule() với lãi suất NIÊM YẾT — vì đó là con
+        số ngân hàng thực sự tính lãi/gốc mỗi kỳ), cộng thêm phí bảo
+        hiểm tái tục hàng năm nếu có.
+     3) Giải ngược ra lãi suất kỳ r sao cho:
+          netAdvance = Σ CF_t / (1+r)^t   (t = 1..n)
+        Đây chính là IRR của dòng tiền vay — không có nghiệm dạng
+        đóng cho dòng tiền tuỳ ý (khác PMT đều), nên dùng bisection
+        (NPV(r) đơn điệu giảm theo r nên luôn hội tụ 1 nghiệm dương).
+   ============================================================ */
+function solvePeriodicIRR(netAdvance, cashOutflows) {
+  if (netAdvance <= 0 || cashOutflows.length === 0) return { rate: 0, hitCeiling: false };
+  const totalOut = cashOutflows.reduce((s, v) => s + v, 0);
+  if (totalOut <= netAdvance * 1.0001) return { rate: 0, hitCeiling: false }; // không có chi phí thực
+
+  const npv = (r) => {
+    let total = 0;
+    for (let t = 0; t < cashOutflows.length; t++) {
+      total += cashOutflows[t] / Math.pow(1 + r, t + 1);
+    }
+    return total - netAdvance;
+  };
+
+  let lo = 0;
+  let hi = 5; // trần 500%/kỳ, đủ bao quát trường hợp cực đoan (phí quá lớn so với gốc)
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (npv(mid) > 0) lo = mid; else hi = mid;
+    if (Math.abs(hi - lo) < 1e-15) break;
+  }
+  const rate = (lo + hi) / 2;
+  return { rate, hitCeiling: rate >= 4.999 };
+}
+
+// offer = {
+//   label, principal, ratePct, termMonths, repaymentType,
+//   upfrontFees,              // tổng phí một lần: thẩm định + giải ngân + công chứng + phí khác
+//   insuranceMode,            // 'none' | 'upfront' | 'annual'
+//   insuranceAmount,          // số tiền bảo hiểm (một lần, hoặc mỗi năm nếu 'annual')
+//   financeFeesIntoLoan       // true = cộng dồn TOÀN BỘ phí một lần (không gồm bảo hiểm annual) vào gốc vay thay vì trả tiền mặt ngay
+// }
+function computeTrueCostOfCapital(offer) {
+  const upfrontFees = Math.max(0, offer.upfrontFees || 0);
+  const insuranceUpfront = offer.insuranceMode === 'upfront' ? Math.max(0, offer.insuranceAmount || 0) : 0;
+  const totalUpfrontCash = upfrontFees + insuranceUpfront;
+
+  // Gốc dùng để dựng lịch trả HỢP ĐỒNG — nếu cộng dồn phí vào gốc thì dư nợ vay cao hơn
+  // đúng bằng phần phí đó (bảo hiểm tái tục hàng năm KHÔNG cộng vào gốc vì nó không phải
+  // khoản vay một lần, mà là chi phí phát sinh lặp lại theo thời gian).
+  const contractPrincipal = offer.financeFeesIntoLoan ? offer.principal + totalUpfrontCash : offer.principal;
+
+  const contractLoan = {
+    principal: contractPrincipal,
+    ratePct: offer.ratePct,
+    termMonths: offer.termMonths,
+    startDate: '2000-01-01', // chỉ dùng nội bộ để sinh lịch trả, không hiển thị ngày
+    repaymentType: offer.repaymentType,
+    paymentTiming: 'end'
+  };
+  const sched = generateSchedule(contractLoan, null);
+
+  // Dòng tiền phải trả mỗi kỳ = kỳ khoản hợp đồng, cộng phí bảo hiểm tái tục vào cuối mỗi năm hợp đồng (kỳ 12, 24, 36...)
+  const cashOutflows = sched.payments.map(p => p.payment);
+  let totalInsuranceAnnual = 0;
+  if (offer.insuranceMode === 'annual' && offer.insuranceAmount > 0) {
+    for (let idx = 0; idx < cashOutflows.length; idx++) {
+      if ((idx + 1) % 12 === 0) {
+        cashOutflows[idx] += offer.insuranceAmount;
+        totalInsuranceAnnual += offer.insuranceAmount;
+      }
+    }
+  }
+
+  // Số tiền thực nhận vào tay để dùng: nếu cộng dồn phí vào gốc thì không mất tiền mặt ngay
+  // (net advance = đúng số tiền gốc muốn vay), nếu không thì phải trừ phí trả ngay bằng tiền mặt.
+  const netAdvance = offer.financeFeesIntoLoan ? offer.principal : (offer.principal - totalUpfrontCash);
+
+  const totalCashOut = cashOutflows.reduce((s, v) => s + v, 0);
+  const { rate: trueMonthlyRate, hitCeiling } = solvePeriodicIRR(netAdvance, cashOutflows);
+  const trueAnnualNominal = trueMonthlyRate * 12;
+  const trueEAR = Math.pow(1 + trueMonthlyRate, 12) - 1;
+
+  // Lãi suất niêm yết gốc (không tính phí/bảo hiểm) để so sánh mức độ "giấu chi phí"
+  const statedMonthlyRate = (offer.ratePct / 100) / 12;
+  const statedEAR = Math.pow(1 + statedMonthlyRate, 12) - 1;
+
+  return {
+    label: offer.label,
+    principal: offer.principal,
+    contractPrincipal,
+    upfrontFees, insuranceUpfront, totalUpfrontCash, totalInsuranceAnnual,
+    netAdvance,
+    totalCashOut,
+    allInCost: totalCashOut - netAdvance, // tổng chi phí thực (lãi + phí + bảo hiểm) so với số tiền thực nhận được dùng
+    trueMonthlyRate, trueAnnualNominal, trueEAR, hitCeiling,
+    statedNominal: offer.ratePct / 100, statedEAR,
+    hiddenCostRateGap: trueEAR - statedEAR, // phần lãi suất "giấu" trong phí/bảo hiểm, quy ra %/năm
+    sched
   };
 }
 
@@ -2107,8 +2220,37 @@ function interpScore(value, points) {
 function scoreDTI(dtiPct) {
   return interpScore(dtiPct, [[0, 100], [30, 96], [40, 82], [50, 58], [60, 30], [75, 10], [100, 0]]);
 }
+// Official CIC ranking bands (Vietnam), score range 403–706, rank 10 = worst, rank 1 = best
+const CIC_RANK_TABLE = [
+  { rank: 10, min: 403, max: 429, category: 'Xấu' },
+  { rank: 9,  min: 430, max: 454, category: 'Xấu' },
+  { rank: 8,  min: 455, max: 479, category: 'Dưới trung bình' },
+  { rank: 7,  min: 480, max: 544, category: 'Dưới trung bình' },
+  { rank: 6,  min: 545, max: 571, category: 'Trung bình' },
+  { rank: 5,  min: 572, max: 587, category: 'Trung bình' },
+  { rank: 4,  min: 588, max: 605, category: 'Tốt' },
+  { rank: 3,  min: 606, max: 621, category: 'Tốt' },
+  { rank: 2,  min: 622, max: 644, category: 'Rất tốt' },
+  { rank: 1,  min: 645, max: 706, category: 'Rất tốt' }
+];
+const CIC_CATEGORY_COLOR = {
+  'Xấu':             { bg: 'var(--alert-soft)', fg: 'var(--alert)' },
+  'Dưới trung bình': { bg: '#f7ddc8',           fg: '#a85f1f' },
+  'Trung bình':      { bg: 'var(--gold-soft)',  fg: 'var(--gold)' },
+  'Tốt':             { bg: '#dcefd5',           fg: '#4f7d33' },
+  'Rất tốt':         { bg: 'var(--accent-soft)',fg: 'var(--accent)' }
+};
+function getCicRank(cic) {
+  const clamped = Math.max(403, Math.min(706, cic));
+  const band = CIC_RANK_TABLE.find(b => clamped >= b.min && clamped <= b.max) || CIC_RANK_TABLE[0];
+  return band;
+}
 function scoreCIC(cic) {
-  return interpScore(cic, [[300, 4], [430, 15], [500, 30], [580, 50], [650, 70], [700, 85], [750, 93], [800, 98], [850, 100]]);
+  // Anchor points at the start of each rank band, mapped to a 0–100 internal scale
+  return interpScore(cic, [
+    [403, 3], [430, 12], [455, 22], [480, 32], [545, 45],
+    [572, 55], [588, 68], [606, 78], [622, 88], [645, 95], [706, 100]
+  ]);
 }
 function scoreIncome(incomeVND, incomeType) {
   const trieu = incomeVND / 1000000;
@@ -2143,6 +2285,19 @@ function renderScoreWeightGrid() {
       computeAndRenderScore();
     });
   });
+}
+
+function renderCicRankBadge() {
+  const badgeEl = document.getElementById('cicRankBadge');
+  if (!badgeEl) return;
+  const val = document.getElementById('sc_cic').value;
+  if (val === '') { badgeEl.innerHTML = ''; return; }
+  const cic = parseFloat(val);
+  if (isNaN(cic)) { badgeEl.innerHTML = ''; return; }
+  const band = getCicRank(cic);
+  const c = CIC_CATEGORY_COLOR[band.category];
+  const outOfRange = cic < 403 || cic > 706;
+  badgeEl.innerHTML = `<span style="display:inline-block; margin-top:0.4rem; padding:0.25rem 0.65rem; border-radius:999px; font-size:0.74rem; font-weight:700; font-family:var(--mono); background:${c.bg}; color:${c.fg};">Hạng ${band.rank} — ${escapeHtml(band.category)}</span>${outOfRange ? '<span class="hint" style="display:block; margin-top:0.2rem;">Điểm ngoài thang 403–706, đang quy về hạng gần nhất.</span>' : ''}`;
 }
 
 function pullDebtFromApp() {
@@ -2217,11 +2372,19 @@ function computeAndRenderScore() {
 
   // Suggestions for weak factors
   const suggestions = [];
+  const cicBand = cic !== null ? getCicRank(cic) : null;
   if (factors.dti < 65) suggestions.push(`DTI hiện khoảng ${dtiPct.toFixed(0)}% — thử giảm nợ hiện có, trả bớt một khoản nhỏ trước khi vay thêm, hoặc chứng minh thêm nguồn thu nhập phụ để kéo tỉ lệ này xuống dưới 40%.`);
-  if (cic !== null && factors.cic < 65) suggestions.push('Điểm CIC chưa cao — ưu tiên trả đúng hạn mọi khoản vay/thẻ tín dụng trong 3–6 tháng tới, giữ tỉ lệ dùng hạn mức thẻ dưới 30%, và tự tra cứu báo cáo CIC để phát hiện sai sót nếu có.');
+  if (cicBand !== null && factors.cic < 65) suggestions.push(`Điểm CIC đang ở Hạng ${cicBand.rank} (${cicBand.category}) — ưu tiên trả đúng hạn mọi khoản vay/thẻ tín dụng trong 3–6 tháng tới, giữ tỉ lệ dùng hạn mức thẻ dưới 30%, và tự tra cứu báo cáo CIC để phát hiện sai sót nếu có. Lên hạng "Tốt" (điểm 588+) sẽ cải thiện đáng kể khả năng được duyệt.`);
   if (factors.income < 65) suggestions.push(incomeType === 'fixed' ? 'Thu nhập theo thang phổ biến vẫn còn khiêm tốn so với khoản vay mong muốn — cân nhắc hồ sơ đồng vay/thế chấp để tăng khả năng duyệt.' : 'Thu nhập không cố định thường bị ngân hàng chiết khấu rủi ro — chuẩn bị sao kê 12–24 tháng thay vì 3 tháng để chứng minh tính ổn định.');
   if (tenure !== null && factors.tenure < 65) suggestions.push('Thâm niên công việc/kinh doanh hiện tại còn ngắn — nhiều ngân hàng muốn tối thiểu 6–12 tháng ở nơi làm việc hiện tại; nếu mới chuyển việc, hồ sơ có thể mạnh hơn nếu gộp thêm thâm niên ngành nghề trước đó.');
   if (collateral === 'none' && total < 65) suggestions.push('Đang xét theo hướng tín chấp — nếu có tài sản đảm bảo (sổ đỏ, ô tô...), hồ sơ thế chấp thường được duyệt dễ hơn và lãi suất thấp hơn đáng kể.');
+
+  const cicRankLine = cicBand ? `
+    <div class="cic-rank-line" style="margin-top:0.6rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+      <span style="font-size:0.8rem; color:var(--ink-soft);">Xếp hạng CIC:</span>
+      <span style="display:inline-block; padding:0.25rem 0.65rem; border-radius:999px; font-size:0.74rem; font-weight:700; font-family:var(--mono); background:${CIC_CATEGORY_COLOR[cicBand.category].bg}; color:${CIC_CATEGORY_COLOR[cicBand.category].fg};">Hạng ${cicBand.rank} — ${escapeHtml(cicBand.category)}</span>
+      <span style="font-size:0.78rem; color:var(--ink-soft);">(${cicBand.min}–${cicBand.max} điểm)</span>
+    </div>` : '';
 
   resultWrap.innerHTML = `
     <div class="score-result">
@@ -2231,9 +2394,10 @@ function computeAndRenderScore() {
       </div>
       <div class="score-factors">${factorRows}</div>
     </div>
+    ${cicRankLine}
     ${isBadDebt ? `<div class="score-flag callout alert"><strong>⚠️ Đang thuộc Nhóm nợ ${debtGroup} (nợ xấu).</strong> Ở nhóm này, hầu hết ngân hàng và công ty tài chính sẽ từ chối hồ sơ vay mới bất kể điểm tổng phía trên — thông tin nợ xấu thường lưu trên CIC tối thiểu vài năm sau khi tất toán. Ưu tiên trả dứt điểm khoản nợ quá hạn trước, sau đó chờ một thời gian (thường 1–5 năm tuỳ nhóm nợ) và giữ lịch sử sạch trước khi nộp hồ sơ mới.</div>` : ''}
     ${suggestions.length ? `<div class="score-suggestions"><h4>Gợi ý cải thiện</h4><ul>${suggestions.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul></div>` : ''}
-    <div class="hint" style="margin-top:0.9rem;">Công cụ này ước lượng theo các ngưỡng phổ biến (DTI, thang điểm CIC 300–850, thâm niên công việc...) — không thay thế quy trình thẩm định thực tế, mỗi ngân hàng/công ty tài chính có mô hình chấm điểm và khẩu vị rủi ro riêng.</div>
+    <div class="hint" style="margin-top:0.9rem;">Công cụ này ước lượng theo các ngưỡng phổ biến (DTI, thang điểm CIC chính thức 403–706 với 10 hạng, thâm niên công việc...) — không thay thế quy trình thẩm định thực tế, mỗi ngân hàng/công ty tài chính có mô hình chấm điểm và khẩu vị rủi ro riêng.</div>
   `;
 }
 
@@ -2245,7 +2409,10 @@ function initScoreTool() {
     el.addEventListener('input', computeAndRenderScore);
     el.addEventListener('change', computeAndRenderScore);
   });
+  document.getElementById('sc_cic').addEventListener('input', renderCicRankBadge);
+  document.getElementById('sc_cic').addEventListener('change', renderCicRankBadge);
   document.getElementById('sc_pull_debt_btn').addEventListener('click', pullDebtFromApp);
+  renderCicRankBadge();
   computeAndRenderScore();
 }
 
