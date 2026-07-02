@@ -408,6 +408,14 @@
             </select>
           </div>
           <div class="field full">
+            <label>Thời điểm trả trong kỳ</label>
+            <select id="f_timing">
+              <option value="end">Cuối kỳ (ordinary annuity — mặc định, phổ biến nhất)</option>
+              <option value="begin">Đầu kỳ (annuity due — trả ngay lúc kỳ bắt đầu)</option>
+            </select>
+            <div class="hint">Trả đầu kỳ nghĩa là khoản trả đầu tiên diễn ra ngay lúc giải ngân (chưa phát sinh lãi), rồi mỗi khoản trả sau thu lãi của kỳ liền trước. Vì tiền về sớm hơn nên khoản trả cố định (kiểu "gốc + lãi cố định") sẽ thấp hơn một chút so với trả cuối kỳ ở cùng lãi suất.</div>
+          </div>
+          <div class="field full">
             <label>Đơn vị tiền (ký hiệu hiển thị)</label>
             <input type="text" id="f_currency" placeholder="₫" value="₫">
           </div>
@@ -691,6 +699,13 @@
               <div class="field">
                 <label>Phí làm hồ sơ / thẩm định / công chứng...</label>
                 <input type="number" id="refi_fees" placeholder="3000000" step="100000">
+              </div>
+              <div class="field">
+                <label>Thời điểm trả (kỳ mới)</label>
+                <select id="refi_timing">
+                  <option value="end">Cuối kỳ (mặc định)</option>
+                  <option value="begin">Đầu kỳ (annuity due)</option>
+                </select>
               </div>
               <div class="field" style="display:flex; align-items:flex-end; padding-bottom: 0.4rem;">
                 <label style="display:flex; align-items:center; gap:0.45rem; font-weight:400; cursor:pointer;">
@@ -1105,6 +1120,15 @@ function pct(value, decimals = 1) {
    - amortizing:     fixed total payment every period (PMT formula)
    - declining:      fixed principal every period, interest shrinks with balance
    - interest_only:  interest-only every period, full principal due at final period
+   Payment timing (loan.paymentTiming):
+   - 'end'   (mặc định) = ordinary annuity, trả CUỐI mỗi kỳ. Lãi kỳ N tính
+              trên dư nợ đầu kỳ N, thu cùng gốc vào cuối kỳ N.
+   - 'begin' = annuity due, trả ĐẦU mỗi kỳ. Khoản trả đầu tiên diễn ra ngay
+              lúc giải ngân nên CHƯA có lãi phát sinh (lãi kỳ 1 = 0). Lãi
+              thu vào lần trả kỳ N (N ≥ 2) là lãi tích luỹ suốt kỳ (N-1),
+              trên dư nợ còn lại NGAY SAU khi đã trả kỳ N-1. Vì dòng tiền
+              về sớm hơn 1 kỳ so với ordinary annuity, khoản trả cố định
+              (amortizing) THẤP hơn đúng hệ số (1+r): PMT_due = PMT_ordinary / (1+r).
    Extra payments (from a "sim" object, not persisted unless the loan itself
    stores them) apply as additional principal reduction on top of the
    scheduled principal for that period, and can pay the loan off early.
@@ -1122,7 +1146,12 @@ function generateSchedule(loan, extraConfig) {
   const monthlyRate = (loan.ratePct / 100) / 12;
   const n = loan.termMonths;
   const startDate = parseDateOnly(loan.startDate);
-  const fixedPayment = loan.repaymentType === 'amortizing' ? computeFixedPayment(principal, monthlyRate, n) : null;
+  const isDue = loan.paymentTiming === 'begin'; // trả đầu kỳ (annuity due) hay cuối kỳ (mặc định)
+
+  const fixedPaymentOrdinary = loan.repaymentType === 'amortizing' ? computeFixedPayment(principal, monthlyRate, n) : null;
+  const fixedPayment = (isDue && fixedPaymentOrdinary !== null)
+    ? fixedPaymentOrdinary / (1 + monthlyRate)
+    : fixedPaymentOrdinary;
   const fixedPrincipalPortion = loan.repaymentType === 'declining' ? principal / n : null;
 
   const payments = [];
@@ -1131,12 +1160,15 @@ function generateSchedule(loan, extraConfig) {
   let totalInterest = 0;
   let totalExtra = 0;
   let payoffPeriod = n;
+  // Lãi "đến hạn thu" tại lần trả tiếp theo — chỉ dùng cho annuity due. Kỳ 1 = 0
+  // vì trả ngay lúc giải ngân, chưa có thời gian nào trôi qua để phát sinh lãi.
+  let accruedInterestDue = 0;
 
   for (let period = 1; period <= n; period++) {
     if (balance <= 0.005) { payoffPeriod = period - 1; break; }
 
     const dueDate = addMonthsClamped(startDate, period);
-    const interest = balance * monthlyRate;
+    const interest = isDue ? accruedInterestDue : balance * monthlyRate;
 
     let scheduledPrincipal;
     if (loan.repaymentType === 'amortizing') {
@@ -1180,6 +1212,12 @@ function generateSchedule(loan, extraConfig) {
 
     prevDate = dueDate;
     payoffPeriod = period;
+
+    if (isDue) {
+      // Lãi sẽ tích luỹ từ bây giờ tới lần trả kế tiếp, trên dư nợ vừa trả xong.
+      accruedInterestDue = balance * monthlyRate;
+    }
+
     if (balance <= 0.005) break;
   }
 
@@ -1469,7 +1507,7 @@ function calculatePayoffWithFee(loan, asOfStr) {
    }
    ============================================================ */
 function calculateRefinance(loan, asOfStr, refi) {
-  const { newRatePct, newTermMonths, newFees = 0, financeFees = false, repaymentType } = refi;
+  const { newRatePct, newTermMonths, newFees = 0, financeFees = false, repaymentType, paymentTiming } = refi;
 
   // Bước 1: chi phí chính xác để đóng khoản vay cũ hôm nay — TÁI DÙNG hàm đã có
   const payoff = calculatePayoffWithFee(loan, asOfStr);
@@ -1481,7 +1519,8 @@ function calculateRefinance(loan, asOfStr, refi) {
     ratePct: newRatePct,
     termMonths: newTermMonths,
     startDate: asOfStr,
-    repaymentType: repaymentType || loan.repaymentType
+    repaymentType: repaymentType || loan.repaymentType,
+    paymentTiming: paymentTiming || loan.paymentTiming || 'end'
   };
   const newSchedule = generateSchedule(newLoan, null); // TÁI DÙNG engine lịch trả nợ chính
 
@@ -1492,9 +1531,10 @@ function calculateRefinance(loan, asOfStr, refi) {
     || oldSchedule.payments[oldSchedule.payments.length - 1];
   const oldMonthlyPayment = nextOldPayment ? nextOldPayment.payment : 0;
 
-  const newMonthlyPayment = newLoan.repaymentType === 'amortizing'
-    ? computeFixedPayment(newPrincipal, (newRatePct / 100) / 12, newTermMonths)
-    : (newSchedule.payments[0] ? newSchedule.payments[0].payment : 0);
+  // Dùng thẳng khoản trả kỳ đầu tiên của newSchedule (đã tính đúng cho mọi kiểu trả
+  // nợ VÀ mọi kiểu thời điểm trả — không recompute công thức PMT riêng ở đây để
+  // tránh sai lệch khi khoản vay mới là annuity due / trả đầu kỳ).
+  const newMonthlyPayment = newSchedule.payments[0] ? newSchedule.payments[0].payment : 0;
 
   // Bước 4: so sánh tổng chi phí "giữ nguyên khoản vay cũ tới hết kỳ hạn" vs "tái cấp vốn"
   // payoff.interestSavedVsFullTerm = tổng lãi CÒN LẠI theo lịch gốc từ giờ tới hết kỳ hạn cũ
@@ -1655,9 +1695,9 @@ function computeMatrixCell(loan, overrides) {
     }
   }
 
-  const payment = clone.repaymentType === 'amortizing'
-    ? computeFixedPayment(clone.principal, (clone.ratePct / 100) / 12, clone.termMonths)
-    : (sched.payments[0] ? sched.payments[0].payment : 0);
+  // Luôn lấy khoản trả kỳ đầu tiên từ sched (đã tính đúng cho mọi kiểu trả nợ và
+  // cả trường hợp trả đầu kỳ / cuối kỳ) thay vì recompute công thức PMT riêng.
+  const payment = sched.payments[0] ? sched.payments[0].payment : 0;
 
   return {
     totalInterest: sched.totalInterest,
@@ -1835,7 +1875,7 @@ function renderLoanCards() {
     return `
       <div class="loan-card ${loan.id === activeLoanId ? 'active' : ''}" data-loan-id="${loan.id}">
         <div class="name">
-          <span>${escapeHtml(loan.name)}<span class="type-tag">${typeLabel[loan.repaymentType]}</span></span>
+          <span>${escapeHtml(loan.name)}<span class="type-tag">${typeLabel[loan.repaymentType]}</span>${loan.paymentTiming === 'begin' ? '<span class="type-tag">Đầu kỳ</span>' : ''}</span>
           <button class="copy-icon-btn" data-copy-loan="${loan.id}" title="Copy thông tin khoản vay này để hỏi AI ngoài">📋 Copy</button>
         </div>
         <div class="figures">
@@ -2288,6 +2328,10 @@ Dựa trên thông tin trên, hãy giúp:
 4) Nếu đang cân nhắc vay thêm: có nên không, rủi ro gì cần lưu ý.
 5) Gợi ý cách kiểm soát chi tiêu phù hợp với dòng tiền hiện tại, và một kế hoạch hành động cụ thể theo tuần/tháng.`;
 
+function timingLabelVN(loan) {
+  return loan.paymentTiming === 'begin' ? ' · trả đầu kỳ (annuity due)' : '';
+}
+
 function buildLoanContextText(loan) {
   const sched = getLoanSchedule(loan);
   const { balance, lastPaymentDate } = balanceAsOfToday(loan);
@@ -2301,7 +2345,7 @@ function buildLoanContextText(loan) {
   return `=== THÔNG TIN KHOẢN VAY: ${loan.name} (xuất ngày ${formatDateVN(today)}) ===
 Số tiền vay gốc: ${money(loan, loan.principal)}
 Lãi suất: ${loan.ratePct}%/năm
-Kiểu trả nợ: ${typeLabelFullVN[loan.repaymentType]}
+Kiểu trả nợ: ${typeLabelFullVN[loan.repaymentType]}${timingLabelVN(loan)}
 Kỳ hạn gốc: ${loan.termMonths} kỳ (tháng), bắt đầu ${formatDateVN(parseDateOnly(loan.startDate))}
 Số tiền trả mỗi kỳ: ${loan.repaymentType === 'amortizing' ? money(loan, sched.payments[0]?.payment || 0) + ' (cố định mỗi kỳ)' : 'thay đổi theo kỳ — xem 3 kỳ tới bên dưới'}
 Dư nợ còn lại (tính đến hôm nay, kỳ trả gần nhất ${formatDateVN(lastPaymentDate)}): ${money(loan, balance)} (đã trả ${paidPct.toFixed(0)}% gốc)
@@ -2331,7 +2375,7 @@ function buildPortfolioContextText() {
     for (const p of sched.payments) if (monthKey(p.date) === thisMonthKey) monthlyThis += p.payment;
     totalMonthlyDue += monthlyThis;
     const nextPay = sched.payments.find(p => p.date >= today);
-    return `- ${loan.name}: dư nợ còn ${money(loan, balance)} / gốc ${money(loan, loan.principal)}, lãi suất ${loan.ratePct}%/năm, ${typeLabelFullVN[loan.repaymentType]}, kỳ tới ${nextPay ? formatDateVN(nextPay.date) + ' — ' + money(loan, nextPay.payment) : '(đã hết)'}. Phí trả chậm: ${formatLateFeeConfigVN(loan.lateFeeConfig)} Phí tất toán sớm: ${formatEarlyFeeConfigVN(loan.earlyPayoffFeeConfig)}`;
+    return `- ${loan.name}: dư nợ còn ${money(loan, balance)} / gốc ${money(loan, loan.principal)}, lãi suất ${loan.ratePct}%/năm, ${typeLabelFullVN[loan.repaymentType]}${timingLabelVN(loan)}, kỳ tới ${nextPay ? formatDateVN(nextPay.date) + ' — ' + money(loan, nextPay.payment) : '(đã hết)'}. Phí trả chậm: ${formatLateFeeConfigVN(loan.lateFeeConfig)} Phí tất toán sớm: ${formatEarlyFeeConfigVN(loan.earlyPayoffFeeConfig)}`;
   }).join('\n');
 
   return `=== TỔNG HỢP DANH MỤC VAY (${loans.length} khoản, xuất ngày ${formatDateVN(today)}) ===
@@ -2366,6 +2410,7 @@ function openLoanForm(loanId) {
     document.getElementById('f_start').value = loan.startDate;
     document.getElementById('f_rate_review').value = loan.rateReviewDate || '';
     document.getElementById('f_type').value = loan.repaymentType;
+    document.getElementById('f_timing').value = loan.paymentTiming || 'end';
     document.getElementById('f_currency').value = loan.currency || '₫';
 
     const lf = loan.lateFeeConfig;
@@ -2389,6 +2434,7 @@ function openLoanForm(loanId) {
     document.getElementById('f_start').value = toDateInputValue(new Date());
     document.getElementById('f_rate_review').value = '';
     document.getElementById('f_type').value = 'amortizing';
+    document.getElementById('f_timing').value = 'end';
     document.getElementById('f_currency').value = '₫';
 
     document.getElementById('f_late_type').value = 'none';
@@ -2464,6 +2510,7 @@ function saveLoanFromForm() {
   const startDate = document.getElementById('f_start').value;
   const rateReviewDate = document.getElementById('f_rate_review').value || null;
   const repaymentType = document.getElementById('f_type').value;
+  const paymentTiming = document.getElementById('f_timing').value;
   const currency = document.getElementById('f_currency').value.trim() || '₫';
   const lateFeeConfig = buildLateFeeConfig();
   const earlyPayoffFeeConfig = buildEarlyPayoffFeeConfig();
@@ -2476,11 +2523,11 @@ function saveLoanFromForm() {
 
   if (activeLoanId) {
     const loan = loans.find(l => l.id === activeLoanId);
-    Object.assign(loan, { name, principal, ratePct, termMonths, startDate, rateReviewDate, repaymentType, currency, lateFeeConfig, earlyPayoffFeeConfig });
+    Object.assign(loan, { name, principal, ratePct, termMonths, startDate, rateReviewDate, repaymentType, paymentTiming, currency, lateFeeConfig, earlyPayoffFeeConfig });
   } else {
     loans.push({
       id: 'loan_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-      name, principal, ratePct, termMonths, startDate, rateReviewDate, repaymentType, currency,
+      name, principal, ratePct, termMonths, startDate, rateReviewDate, repaymentType, paymentTiming, currency,
       persistedExtra: null, lateFeeConfig, earlyPayoffFeeConfig
     });
   }
@@ -2944,6 +2991,7 @@ function renderRefiTab() {
     const paidPeriods = Array.isArray(loan.paidPeriods) ? loan.paidPeriods : [];
     const remainingPeriods = sched.payments.filter(p => !paidPeriods.includes(p.period)).length || loan.termMonths;
     if (!document.getElementById('refi_term').value) document.getElementById('refi_term').value = remainingPeriods;
+    document.getElementById('refi_timing').value = loan.paymentTiming || 'end';
   };
   select.onchange = prefillTerm;
   prefillTerm();
@@ -2956,12 +3004,13 @@ function renderRefiTab() {
     const newTermMonths = parseInt(document.getElementById('refi_term').value, 10);
     const newFees = parseFloat(document.getElementById('refi_fees').value) || 0;
     const financeFees = document.getElementById('refi_finance_fees').checked;
+    const paymentTiming = document.getElementById('refi_timing').value;
 
     if (isNaN(newRatePct) || newRatePct < 0) { alert('Nhập lãi suất mới hợp lệ.'); return; }
     if (isNaN(newTermMonths) || newTermMonths <= 0) { alert('Nhập kỳ hạn mới hợp lệ.'); return; }
     if (!dateInput.value) { alert('Chọn ngày dự định tái cấp vốn.'); return; }
 
-    const r = calculateRefinance(loan, dateInput.value, { newRatePct, newTermMonths, newFees, financeFees });
+    const r = calculateRefinance(loan, dateInput.value, { newRatePct, newTermMonths, newFees, financeFees, paymentTiming });
     const cur = loan.currency || '₫';
     const fmt = (v) => numberFmt.format(Math.round(v)) + ' ' + cur;
     const hasEarlyFee = loan.earlyPayoffFeeConfig && loan.earlyPayoffFeeConfig.enabled;
@@ -3377,7 +3426,11 @@ function runChannelMatrix() {
 function renderSensitivitySection(loan) {
   const cur = loan.currency || '₫';
   const fmt = (v) => numberFmt.format(Math.round(v));
-  const basePMT = computeFixedPayment(loan.principal, (loan.ratePct / 100) / 12, loan.termMonths);
+  // Lấy khoản trả kỳ đầu tiên trực tiếp từ lịch trả thực tế của khoản vay — đúng cho
+  // mọi kiểu trả nợ (amortizing/declining/interest_only) và mọi kiểu thời điểm trả
+  // (đầu kỳ/cuối kỳ), thay vì giả định amortizing như công thức PMT thuần trước đây.
+  const baseSchedForPMT = getLoanSchedule(loan);
+  const basePMT = baseSchedForPMT.payments[0] ? baseSchedForPMT.payments[0].payment : 0;
   const extraAmounts = [0, Math.round(basePMT * 0.1), Math.round(basePMT * 0.25), Math.round(basePMT * 0.5), Math.round(basePMT)];
   const extraSens = sensitivityExtraPayments(loan, extraAmounts);
 
